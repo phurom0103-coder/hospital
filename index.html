@@ -1,0 +1,3175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>병원 DB</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5821F">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="병원 DB">
+<style>
+  :root {
+    --orange:      #F5821F;
+    --orange-dk:   #E06A0A;
+    --orange-tint: #FFF2E5;
+
+    --ink:      #1F1B17;
+    --ink-mid:  #6B6259;
+    --ink-dim:  #9A918A;
+    --paper:    #F7F3EF;
+    --surface:  #FFFFFF;
+    --rule:     #EBE4DD;
+
+    --go:      #1B7A43;
+    --go-bg:   #E6F3EA;
+    --stop:    #B3261E;
+    --stop-bg: #FBEAE8;
+    --wait:    #4A5B6E;
+    --wait-bg: #EBEFF3;
+
+    --shadow: 0 1px 2px rgba(60,40,20,.05), 0 4px 14px rgba(120,70,20,.06);
+    --tabh:   62px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+                 "Noto Sans KR", "Malgun Gothic", sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.45;
+    padding-bottom: calc(var(--tabh) + 84px);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible { outline: 2px solid var(--orange-dk); outline-offset: 2px; }
+
+  /* ---------- 상단 ---------- */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--orange); color: #fff;
+    padding: 14px 16px 16px;
+    border-radius: 0 0 20px 20px;
+  }
+  header h1 {
+    margin: 0 0 11px;
+    font-size: 18px; font-weight: 700; letter-spacing: -.02em;
+  }
+  header h1 .num {
+    font-size: 13.5px; font-weight: 600; margin-left: 8px;
+    opacity: .85; font-variant-numeric: tabular-nums;
+  }
+  #search {
+    width: 100%; height: 46px;
+    padding: 0 15px; border: none; border-radius: 12px;
+    font-size: 16px; font-family: inherit; color: var(--ink);
+    background: #fff;
+  }
+  #search::placeholder { color: var(--ink-dim); }
+
+  .wrap { padding: 16px 14px 0; }
+
+  /* ---------- 하단 탭 ---------- */
+  #tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    display: flex; gap: 4px;
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  }
+  #tabs button {
+    flex: 1; height: 44px; min-width: 0;
+    background: none; color: var(--ink-mid); border-radius: 22px;
+    font-size: 14px; font-weight: 500; padding: 0;
+  }
+  #tabs button.on {
+    color: var(--orange-dk); font-weight: 700;
+    background: var(--orange-tint);
+    box-shadow: inset 0 0 0 1.5px var(--orange);
+  }
+  .tabcnt {
+    display: none; margin-left: 5px; font-size: 11px; font-weight: 700;
+    background: var(--wait); color: #fff; border-radius: 9px; padding: 1px 6px;
+    vertical-align: 1px;
+  }
+  .tabcnt.show { display: inline-block; }
+
+  /* ---------- 레코드 카드 ---------- */
+  .rec {
+    background: var(--surface);
+    border-left: 5px solid #E3DCD5;
+    border-radius: 13px;
+    box-shadow: var(--shadow);
+    padding: 11px 13px 10px;
+    margin-bottom: 8px;
+  }
+  /* 당일발급이 되는 것이 보통이므로 초록 표시는 두지 않는다.
+     불가능한 곳만 눈에 띄게 한다. */
+  .rec.r-no   { border-left-color: var(--stop); }
+  .rec.r-hold { border-left-color: var(--wait); }
+
+  .rec h2 {
+    margin: 0;
+    font-size: 16.5px; font-weight: 700; letter-spacing: -.02em;
+  }
+  .addr {
+    color: var(--ink-mid); font-size: 12.5px; margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* 당일발급 표시: 불가능하거나 확인 안 된 경우에만 나온다 */
+  .tag {
+    display: inline-block; margin-top: 6px;
+    font-size: 12.5px; font-weight: 700;
+    padding: 3px 9px; border-radius: 8px;
+  }
+  .tag.no  { background: var(--stop-bg); color: var(--stop); }
+  .tag.unk { background: #F2EEEA; color: var(--ink-mid); font-weight: 600; }
+
+  /* 병원DB 카드: 수정 버튼을 이름 옆에 두어 아래 한 줄을 없앤다 */
+  .dbhead { display: flex; align-items: center; gap: 7px; }
+  .dbhead h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 사전신청은 판단에 바로 쓰이므로 수정 버튼 왼쪽에 붙여 둔다 */
+  .dbhead .pre {
+    flex: 0 0 auto; font-size: 12px; font-weight: 700;
+    padding: 4px 9px; border-radius: 8px; white-space: nowrap;
+    background: var(--go-bg); color: var(--go);
+  }
+  .dbhead .pre.no { background: var(--stop-bg); color: var(--stop); }
+  .dbhead .edit {
+    flex: 0 0 auto; min-height: 32px; padding: 0 14px; border-radius: 16px;
+    background: transparent; box-shadow: inset 0 0 0 1px #DDD5CE;
+    color: var(--ink-mid); font-size: 12.5px; font-weight: 600;
+  }
+
+  /* 나머지 정보는 한 줄로 이어 붙인다 */
+  .meta { margin-top: 5px; font-size: 12.5px; line-height: 1.8; color: var(--ink); }
+  .meta > span { white-space: nowrap; }   /* 항목 이름과 값이 갈라지지 않게 */
+  .meta i { font-style: normal; color: var(--ink-dim); margin-right: 4px; }
+  .meta .chk { color: var(--ink-dim); }
+  .meta .chk.old { color: var(--stop); font-weight: 700; }
+  .meta b { font-weight: 600; }
+  .meta b.no  { color: var(--stop); font-weight: 700; }
+  .meta b.yes { color: var(--go);   font-weight: 700; }
+  .meta b.wait { color: var(--wait); font-weight: 700; }
+  .meta .sep { color: #DCD5CE; margin: 0 6px; }
+  /* 병원DB: 지역 구분줄 */
+  .rhead {
+    margin: 17px 3px 7px; font-size: 13px; font-weight: 800;
+    color: var(--ink-mid); letter-spacing: -0.2px;
+  }
+  .rhead:first-child { margin-top: 3px; }
+  .rhead .cnt { font-size: 11.5px; font-weight: 600; color: var(--ink-dim); margin-left: 5px; }
+
+
+  .memo {
+    margin-top: 8px; padding: 7px 10px;
+    background: var(--orange-tint); border-radius: 9px;
+    font-size: 12.5px; white-space: pre-wrap; color: #6B4519;
+  }
+
+  .foot { display: flex; gap: 7px; margin-top: 9px; }
+  .foot button { flex: 1; min-height: 40px; padding: 0 10px; border-radius: 10px; }
+  .foot.split { justify-content: space-between; align-items: center; }
+  .foot.split button { flex: 0 0 auto; min-height: 34px; padding: 0 16px; }
+
+  .checked { font-size: 12px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+  .checked.old { color: var(--stop); font-weight: 600; }
+
+  .ver {
+    text-align: center; font-size: 11.5px; color: #9A8F86;
+    padding: 16px 0 6px; cursor: pointer; -webkit-user-select: none; user-select: none;
+  }
+  .missing { color: var(--stop); font-size: 13px; font-weight: 600; margin-top: 5px; }
+
+  /* ---------- 방문 순서 ---------- */
+  .ordhead { display: flex; align-items: flex-start; gap: 9px; }
+  .ordhead h2 { flex: 1; min-width: 0; margin: 0; }
+  .ordnum {
+    flex: 0 0 auto; width: 25px; height: 25px; line-height: 25px; text-align: center;
+    border-radius: 13px; background: var(--orange); color: #fff;
+    font-size: 13px; font-weight: 700; margin-top: 1px;
+    font-variant-numeric: tabular-nums;
+  }
+  .ordbtns { flex: 0 0 auto; display: flex; gap: 5px; }
+  .ordbtns button {
+    width: 36px; height: 36px; padding: 0; border-radius: 10px;
+    background: #F4F0EC; color: var(--ink-mid); font-size: 14px; line-height: 1;
+  }
+  .ordbtns button[disabled] { opacity: .3; }
+
+  /* ---------- 길찾기 버튼 ---------- */
+  .route {
+    display: block; width: 100%; margin-top: 9px; min-height: 44px;
+    background: var(--orange-tint); color: var(--orange-dk);
+    box-shadow: inset 0 0 0 1.5px var(--orange);
+    font-size: 14px; font-weight: 700; border-radius: 11px;
+  }
+
+  /* ---------- 완료 처리된 방문 ---------- */
+  /* 카드 모양은 그대로 두고, 회색으로 흐리게만 처리한다 */
+  .rec.done {
+    background: #F4F1ED;
+    border-left-color: #DFD8D1;
+    box-shadow: none;
+    opacity: .58;
+  }
+  .rec.done h2 {
+    color: var(--ink-mid);
+    text-decoration: line-through;
+    text-decoration-thickness: 1.5px;
+  }
+  .donehead { display: flex; align-items: flex-start; gap: 10px; }
+  .donehead h2 { flex: 1; min-width: 0; }
+  .donehead .undo {
+    flex: 0 0 auto; min-height: 34px; padding: 0 14px; border-radius: 17px;
+    background: transparent; box-shadow: inset 0 0 0 1px #D6CEC7;
+    color: var(--ink-mid); font-size: 13px; font-weight: 600;
+  }
+
+  /* ---------- 날짜 구분 ---------- */
+  .dayhead {
+    display: flex; align-items: center; gap: 9px;
+    margin: 24px 4px 10px;
+    font-size: 15px; font-weight: 700; letter-spacing: -.02em;
+  }
+  .dayhead:first-child { margin-top: 2px; }
+  .dayhead .cnt { font-weight: 500; color: var(--ink-mid); font-size: 12.5px; }
+  .dayhead.today { color: var(--orange-dk); }
+  .dayhead .mapbtn {
+    margin-left: auto; min-height: 34px; padding: 0 16px; border-radius: 17px;
+    background: var(--surface); box-shadow: var(--shadow);
+    color: var(--ink); font-size: 13px; font-weight: 600;
+  }
+
+  /* 보류 재방문일 */
+  .holddate {
+    font-size: 14px; font-weight: 700; color: var(--wait);
+    background: var(--wait-bg); display: inline-block;
+    padding: 6px 12px; border-radius: 10px; margin-bottom: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .holddate.tbd { color: var(--stop); background: var(--stop-bg); }
+
+  /* ---------- 버튼 ---------- */
+  button {
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    border: none; border-radius: 11px;
+    padding: 10px 16px; background: var(--orange); color: #fff;
+    cursor: pointer;
+  }
+  button.ghost { background: #EFEBE7; color: var(--ink); }
+  button.hold  { background: var(--wait-bg); color: var(--wait); }
+  button.small { font-size: 13.5px; }
+  button:active { opacity: .68; }
+
+  #fab {
+    position: fixed; right: 18px;
+    bottom: calc(var(--tabh) + 22px + env(safe-area-inset-bottom));
+    width: 58px; height: 58px; border-radius: 29px;
+    font-size: 30px; font-weight: 300; line-height: 1; padding: 0;
+    background: var(--orange);
+    box-shadow: 0 6px 18px rgba(200,110,20,.42);
+    z-index: 41;
+  }
+
+  /* ---------- 시트 ---------- */
+  .sheet {
+    position: fixed; inset: 0; background: var(--surface);
+    z-index: 50; overflow-y: auto; display: none;
+    padding: 18px 16px 112px;
+    animation: rise .16s ease-out;
+  }
+  @keyframes rise { from { transform: translateY(14px); opacity: .4; } }
+  @media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+
+  .sheet h2 { margin: 2px 0 20px; font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+
+  label { display: block; margin-bottom: 17px; }
+  label span.lbl {
+    display: block; font-size: 13px; font-weight: 600;
+    color: var(--ink-mid); margin-bottom: 7px;
+  }
+  input[type=text], input[type=time], input[type=date], textarea {
+    width: 100%; padding: 12px 13px; font-size: 16px;
+    border: 1.5px solid var(--rule); border-radius: 12px;
+    font-family: inherit; background: var(--surface); color: var(--ink);
+  }
+  input[type=text]:focus, textarea:focus { border-color: var(--orange); outline: none; }
+  input[type=time], input[type=date] { font-variant-numeric: tabular-nums; }
+  textarea { min-height: 94px; resize: vertical; line-height: 1.5; }
+  #pickSearch { margin-bottom: 4px; }
+
+  .seg { display: flex; gap: 7px; }
+  .seg button {
+    flex: 1; min-height: 48px; padding: 0 4px; border-radius: 12px;
+    background: #F4F0EC; color: var(--ink-mid);
+    font-size: 14px; font-weight: 500;
+  }
+  .seg button.sel { background: var(--orange); color: #fff; font-weight: 700; }
+  .seg.wrap { flex-wrap: wrap; }
+  .seg.wrap button { flex: 1 1 29%; min-width: 92px; }
+
+  .lunchbox, .datebox { display: flex; gap: 7px; align-items: center; }
+  .lunchbox input[type=time], .datebox input[type=date] { flex: 1; min-width: 0; }
+  .lunchbox .dash { color: var(--ink-dim); }
+  .lunchbox button, .datebox button {
+    flex: 0 0 68px; min-height: 48px; padding: 0; border-radius: 12px;
+    background: #F4F0EC; color: var(--ink-mid); font-size: 13.5px; font-weight: 500;
+  }
+  .lunchbox button.sel, .datebox button.sel { background: var(--orange); color: #fff; font-weight: 700; }
+
+  .actions {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: var(--surface); border-top: 1px solid var(--rule);
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    display: flex; gap: 9px; z-index: 60;
+  }
+  .actions button { flex: 1; min-height: 50px; font-size: 15px; font-weight: 700; border-radius: 13px; }
+  .actions button.del { flex: 0 0 66px; background: var(--stop-bg); color: var(--stop); }
+
+  .chkrow {
+    display: flex; align-items: center; gap: 9px; min-height: 46px;
+    padding: 0 13px; border-radius: 11px; background: #F4F0EC;
+    cursor: pointer; -webkit-user-select: none; user-select: none;
+  }
+  .chkrow .box {
+    flex: 0 0 auto; width: 22px; height: 22px; line-height: 22px; text-align: center;
+    border-radius: 6px; background: #fff; box-shadow: inset 0 0 0 1.5px #D8D0C9;
+    color: transparent; font-size: 14px; font-weight: 700;
+  }
+  .chkrow .txt { font-size: 13.5px; color: var(--ink-mid); }
+  .chkrow.on { background: var(--go-bg); }
+  .chkrow.on .box { background: var(--go); box-shadow: none; color: #fff; }
+  .chkrow.on .txt { color: var(--go); font-weight: 600; }
+
+  /* ---------- 병원 선택 ---------- */
+  .picklist { margin-top: 10px; }
+  .pickitem {
+    padding: 15px 6px; border-bottom: 1px solid #F2EDE8;
+    font-size: 16px; cursor: pointer;
+  }
+  .pickitem:active { background: #FAF7F4; }
+  .pickitem small { display: block; color: var(--ink-mid); font-size: 12.5px; margin-top: 3px; }
+
+  /* ---------- 동선 ---------- */
+  .planbar {
+    background: var(--surface); border-radius: 13px; box-shadow: var(--shadow);
+    padding: 11px; margin-bottom: 10px;
+  }
+  .locline { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .locline .tag {
+    flex: 0 0 auto; width: 30px; font-size: 12px; font-weight: 700; color: var(--ink-dim);
+  }
+  .locline button.sub {
+    flex: 1; min-height: 40px; border-radius: 10px; font-size: 12.5px; font-weight: 600;
+    padding: 0 6px; background: #F4F0EC; color: var(--ink-mid);
+  }
+  .locline button.sub.on {
+    background: var(--orange-tint); color: var(--orange-dk);
+    box-shadow: inset 0 0 0 1.5px var(--orange);
+  }
+  .locnow { font-size: 12px; color: var(--ink-mid); margin: 8px 0 10px; }
+  .locnow b { color: var(--ink); font-weight: 600; }
+  #addrBox, #endBox { display: none; margin-bottom: 6px; }
+  #addrBox .arow, #endBox .arow { display: flex; gap: 6px; align-items: center; }
+  #addrBox input, #endBox input {
+    flex: 1 1 auto; min-width: 0;
+    width: 100%; height: 42px; padding: 0 13px; border-radius: 10px;
+    border: none; box-shadow: inset 0 0 0 1.5px var(--rule); font-size: 15px;
+    font-family: inherit; color: var(--ink); background: #fff; }
+  #addrBox .find, #endBox .find {
+    flex: 0 0 auto; height: 42px; padding: 0 17px; border-radius: 10px;
+    border: none; background: var(--orange); color: #fff;
+    font-size: 14px; font-weight: 700; font-family: inherit; }
+  .locnow .found { color: var(--ink-mid); font-weight: 400; }
+  .calcbtn {
+    display: block; width: 100%; min-height: 46px; border-radius: 11px;
+    font-size: 14.5px; font-weight: 700;
+  }
+
+  /* 최단거리 / 최단시간 견주기 */
+  .modebox { display: flex; gap: 8px; margin-bottom: 10px; }
+  .modebtn {
+    flex: 1; min-height: 58px; border-radius: 12px; padding: 8px 6px;
+    background: var(--surface); box-shadow: var(--shadow);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  }
+  .modebtn .nm { font-size: 13px; font-weight: 700; color: var(--ink-mid); }
+  .modebtn .val { font-size: 11.5px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+  .modebtn.on { background: var(--orange-tint); box-shadow: inset 0 0 0 2px var(--orange); }
+  .modebtn.on .nm { color: var(--orange-dk); }
+  .modebtn.on .val { color: var(--orange-dk); }
+
+  /* 계산된 순서로 보여줄 때의 카드 */
+  .rec.planrec .ordhead { align-items: center; gap: 8px; }
+  .rec.planrec h2 { flex: 1; min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .kd { flex: 0 0 auto; font-size: 11.5px; font-weight: 700;
+    padding: 3px 8px; border-radius: 7px; background: #F0ECE8; color: var(--ink-mid); }
+  .kd.get  { background: var(--go-bg);   color: var(--go); }
+  .kd.put  { background: var(--wait-bg); color: var(--wait); }
+  .kd.both { background: var(--orange-tint); color: var(--orange-dk); }
+  .kd.warn { background: var(--stop-bg); color: var(--stop); }
+
+  /* 왜 이렇게 도는지 한 줄 설명 */
+  .whyline {
+    margin-top: 9px; font-size: 12.5px; color: var(--wait); font-weight: 600;
+    background: var(--wait-bg); border-radius: 9px; padding: 7px 10px;
+  }
+  .whyline.stay { color: var(--ink-mid); background: #F2EEEA; }
+  .whyline.warn { color: var(--stop); background: var(--stop-bg); }
+
+  /* 출발 전에 해둘 일 */
+  .prebox {
+    background: var(--go-bg); color: var(--go); border-radius: 12px;
+    padding: 11px 13px; margin-bottom: 10px; font-size: 12.5px; line-height: 1.6;
+  }
+  .prebox b { font-size: 13px; }
+  .route.wide { margin-top: 2px; margin-bottom: 4px; }
+  /* 동선 카드의 길찾기 · 먼저 가기 줄 */
+  .navrow { display: flex; gap: 7px; margin-top: 9px; }
+  .navrow .route { flex: 1; margin-top: 0; min-height: 40px; font-size: 13.5px; padding: 0 6px; }
+  .navrow .pinbtn {
+    flex: 0 0 auto; min-height: 40px; padding: 0 13px; border-radius: 11px;
+    background: #F4F0EC; color: var(--ink-mid); font-size: 13.5px; font-weight: 700;
+  }
+  .navrow .pinbtn.on { background: var(--orange); color: #fff; }
+  .pinbar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    background: var(--orange-tint); border-radius: 11px;
+    padding: 9px 11px; margin-bottom: 9px;
+    font-size: 12.5px; font-weight: 600; color: var(--orange-dk);
+  }
+  .pinbar .who { flex: 1; min-width: 0; line-height: 1.5; }
+  .pinbar button {
+    flex: 0 0 auto; min-height: 32px; padding: 0 12px; border-radius: 9px;
+    background: #fff; color: var(--ink-mid); font-size: 12.5px; font-weight: 700;
+    box-shadow: inset 0 0 0 1.5px var(--rule);
+  }
+  .ordhead .pinmark { color: var(--orange); font-size: 13px; margin-left: 2px; }
+
+  /* 주유 · 충전 */
+  #gasfab {
+    position: fixed; right: 22px;
+    bottom: calc(var(--tabh) + 90px + env(safe-area-inset-bottom));
+    width: 50px; height: 50px; border-radius: 25px;
+    font-size: 22px; line-height: 1; padding: 0;
+    background: var(--surface); color: var(--ink);
+    box-shadow: 0 4px 14px rgba(0,0,0,.16), inset 0 0 0 1.5px var(--rule);
+    z-index: 41;
+  }
+  .gasitem {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border-radius: 13px;
+    padding: 12px 13px; margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.07);
+  }
+  .gasitem .no {
+    flex: 0 0 auto; width: 22px; text-align: center;
+    font-size: 13px; font-weight: 800; color: var(--ink-dim);
+  }
+  .gasitem .who { flex: 1; min-width: 0; }
+  .gasitem .who b { display: block; font-size: 15px; font-weight: 700; line-height: 1.35; }
+  .gasitem .who small { font-size: 12px; color: var(--ink-dim); }
+  .gasitem .pr {
+    flex: 0 0 auto; text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .gasitem .pr b { display: block; font-size: 16px; font-weight: 800; }
+  .gasitem .pr small { font-size: 11.5px; color: var(--ink-dim); }
+  .gasitem.cheap .pr b { color: var(--go); }
+  .gasitem button {
+    flex: 0 0 auto; min-height: 38px; padding: 0 12px; border-radius: 10px;
+    background: var(--orange-tint); color: var(--orange-dk); font-size: 13px; font-weight: 700;
+    box-shadow: inset 0 0 0 1.5px var(--orange);
+  }
+  #gasNote { font-size: 12px; color: var(--ink-dim); line-height: 1.6; padding: 4px 2px 10px; }
+  .planend { font-size: 13.5px; font-weight: 700; text-align: center;
+    padding: 6px 0 12px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .plannote { font-size: 12px; color: var(--ink-dim); line-height: 1.6; padding: 0 4px 14px; }
+  .planwarn { background: var(--stop-bg); color: var(--stop); font-size: 12.5px;
+    border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-weight: 600; line-height: 1.55; }
+
+  /* ---------- 지도 ---------- */
+  #mapSheet { padding: 0; }
+  #mapTop {
+    position: absolute; top: 0; left: 0; right: 0; height: 56px; z-index: 61;
+    background: var(--orange); color: #fff; display: flex; align-items: center;
+    padding: 0 14px; gap: 10px;
+  }
+  #mapTop span { font-size: 16px; font-weight: 700; }
+  #mapTop button { margin-left: auto; background: rgba(255,255,255,.25); color: #fff; min-height: 36px; }
+  #map { position: absolute; top: 56px; left: 0; right: 0; bottom: 0; }
+  .pin {
+    background: var(--orange); color: #fff; border-radius: 50%;
+    width: 28px; height: 28px; line-height: 28px; text-align: center;
+    font-size: 13px; font-weight: 700; border: 2px solid #fff;
+    box-shadow: 0 1px 5px rgba(0,0,0,.4);
+  }
+  #mapWarn {
+    position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 61;
+    background: rgba(179,38,30,.94); color: #fff; padding: 11px 13px;
+    border-radius: 12px; font-size: 13px; display: none;
+  }
+
+  /* ---------- 조사자 확인 ---------- */
+  #login .who { margin: -8px 0 22px; font-size: 13.5px; color: var(--ink-mid); }
+  #l_msg { min-height: 22px; font-size: 13.5px; font-weight: 600; color: var(--stop); }
+  #l_msg.busy { color: var(--ink-mid); }
+
+  /* ---------- 빈 화면 · 토스트 ---------- */
+  .empty {
+    text-align: center; color: var(--ink-mid);
+    padding: 64px 24px; font-size: 14.5px; line-height: 1.7;
+  }
+  /* 새 판이 올라왔을 때 뜨는 알림 */
+  #upd {
+    display: none; position: fixed; z-index: 60;
+    left: 10px; right: 10px; bottom: calc(var(--tabh) + 14px);
+    background: var(--ink); color: #fff;
+    border-radius: 13px; padding: 12px 12px 12px 16px;
+    align-items: center; gap: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.28);
+    font-size: 13.5px; font-weight: 600;
+  }
+  #upd.on { display: flex; }
+  #upd span { flex: 1; min-width: 0; }
+  #upd button {
+    flex: 0 0 auto; min-height: 38px; padding: 0 16px; border-radius: 10px;
+    background: var(--orange); color: #fff; font-size: 13.5px; font-weight: 700;
+  }
+
+  #toast {
+    position: fixed; left: 50%; bottom: calc(var(--tabh) + 88px);
+    transform: translateX(-50%);
+    background: rgba(31,27,23,.93); color: #fff;
+    padding: 11px 19px; border-radius: 22px;
+    font-size: 13.5px; display: none; z-index: 100;
+    max-width: 88vw; text-align: center; white-space: pre-line; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="pageTitle">방문일정</h1>
+  <input id="search" type="text" placeholder="병원명 검색" oninput="render()">
+</header>
+
+<div class="wrap" id="list"><div class="empty">불러오는 중…</div></div>
+
+<button id="gasfab" onclick="openGas()">⛽</button>
+<button id="fab" onclick="onFab()">+</button>
+
+<div id="tabs">
+  <button id="tab_visit" class="on" onclick="switchTab('visit')">방문일정</button>
+  <button id="tab_hold" onclick="switchTab('hold')">보류<span id="holdCnt" class="tabcnt"></span></button>
+  <button id="tab_db" onclick="switchTab('db')">병원DB</button>
+</div>
+
+<!-- 지도 -->
+<div id="mapSheet" class="sheet">
+  <div id="mapTop">
+    <span id="mapTitle">지도</span>
+    <button class="small" onclick="closeMap()">닫기</button>
+  </div>
+  <div id="map"></div>
+  <div id="mapWarn"></div>
+</div>
+
+<!-- 병원 정보 입력 -->
+<div id="form" class="sheet">
+  <h2 id="formTitle">병원 추가</h2>
+  <label><span class="lbl">병원명 *</span><input type="text" id="f_name"></label>
+  <label><span class="lbl">주소</span><input type="text" id="f_addr"></label>
+  <label><span class="lbl">당일발급</span><div class="seg" id="seg_sameday"></div></label>
+  <label><span class="lbl">사전신청</span><div class="seg" id="seg_prereq"></div></label>
+  <label><span class="lbl">서류 발급 소요시간</span><div class="seg wrap" id="seg_wait"></div></label>
+  <label><span class="lbl">진료시작</span><input type="time" id="f_open"></label>
+  <div id="rawNote" style="display:none;font-size:12.5px;color:#B3261E;margin:-4px 0 12px;line-height:1.5"></div>
+  <label>
+    <span class="lbl">점심시간</span>
+    <div class="lunchbox">
+      <input type="time" id="f_lunch_s" onchange="onLunchTime()">
+      <span class="dash">–</span>
+      <input type="time" id="f_lunch_e" onchange="onLunchTime()">
+      <button type="button" id="lunchNone" onclick="toggleLunchNone()">없음</button>
+    </div>
+    <div class="seg wrap" id="lunchQuick" style="margin-top:7px"></div>
+  </label>
+  <label><span class="lbl">주차</span><div class="seg" id="seg_parking"></div></label>
+  <label><span class="lbl">발급 방식</span>
+    <div class="chkrow" id="f_stay" onclick="toggleStay()">
+      <span class="box">✓</span>
+      <span class="txt">접수하고 기다렸다 받음 (자리를 뜨지 않음)</span>
+    </div>
+  </label>
+  <label id="paddrRow"><span class="lbl">주차장 주소</span>
+    <input type="text" id="f_paddr" placeholder="차를 실제로 대는 곳의 주소">
+  </label>
+  <label><span class="lbl">메모</span><textarea id="f_memo" placeholder="자유롭게 입력"></textarea></label>
+  <div class="actions">
+    <button class="ghost" onclick="closeSheet('form')">취소</button>
+    <button onclick="saveHospital_()">저장</button>
+    <button class="del" id="delBtn" onclick="delHospital_()" style="display:none">삭제</button>
+  </div>
+</div>
+
+<!-- 주유소 · LPG충전소 -->
+<div id="gasSheet" class="sheet">
+  <h2 id="gasTitle">동선 위의 주유·충전</h2>
+  <div class="seg" id="seg_gasmode" style="margin-bottom:8px"></div>
+  <div class="seg wrap" id="seg_fuel" style="margin-bottom:10px"></div>
+  <div id="gasNote">현재 위치를 잡는 중…</div>
+  <div id="gasList"></div>
+  <div class="actions">
+    <button class="ghost" onclick="closeSheet('gasSheet')">닫기</button>
+    <button onclick="loadGas(1)">다시 불러오기</button>
+  </div>
+</div>
+
+<!-- 병원 선택 -->
+<div id="picker" class="sheet">
+  <h2>병원 선택</h2>
+  <input type="text" id="pickSearch" placeholder="검색" oninput="renderPicker()">
+  <div class="picklist" id="pickList"></div>
+  <div class="actions"><button class="ghost" onclick="closeSheet('picker')">닫기</button></div>
+</div>
+
+<!-- 방문 등록/수정 -->
+<div id="visitForm" class="sheet">
+  <h2 id="visitTitle">방문 등록</h2>
+  <label><span class="lbl">병원</span><input type="text" id="v_name" readonly style="background:#F7F4F1"></label>
+  <label>
+    <span class="lbl">방문일자</span>
+    <div class="datebox">
+      <input type="date" id="v_date" onchange="onVisitDate()">
+      <button type="button" id="dateTbd" onclick="toggleTbd()">미정</button>
+    </div>
+  </label>
+  <label><span class="lbl">접수</span>
+    <div class="chkrow" id="v_sub" onclick="toggleSub()">
+      <span class="box">✓</span>
+      <span class="txt">접수 완료 — 가서 받기만 하면 됨</span>
+    </div>
+  </label>
+  <label><span class="lbl">메모</span><textarea id="v_memo" placeholder="특이사항"></textarea></label>
+  <div class="actions">
+    <button class="ghost" onclick="closeSheet('visitForm')">취소</button>
+    <button onclick="saveVisit_()">저장</button>
+    <button class="del" id="vDelBtn" onclick="delVisit_()" style="display:none">삭제</button>
+  </div>
+</div>
+
+<!-- 조사자 확인 -->
+<div id="login" class="sheet">
+  <h2>조사자 확인</h2>
+  <p class="who">발급받은 코드를 입력하세요. 한 번만 입력하면 이 기기에 기억됩니다.</p>
+  <label><span class="lbl">코드</span>
+    <input type="text" id="l_code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="코드 입력">
+  </label>
+  <div id="l_msg"></div>
+  <div class="actions"><button onclick="doLogin()">확인</button></div>
+</div>
+
+<div id="upd">
+  <span id="updTxt">새 버전이 나왔습니다</span>
+  <button onclick="doUpdate()">새로고침</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+var TAB = 'visit';
+try {
+  var _t0 = localStorage.getItem('hdb_tab');
+  if (_t0 === 'visit' || _t0 === 'hold' || _t0 === 'db') TAB = _t0;
+} catch (e) {}
+var DB = [], VISITS = [];
+var editId = null, vEditId = null, vHid = '';
+var lunchNone = false, dateTbd = false;
+var stayWait = false;   /* 접수 후 그 자리에서 대기 */
+var rawOpen = '', rawLunch = '';   /* 시각칸이 못 읽은 원래 글자 */
+var seg = { sameday: '', prereq: '', parking: '', wait: '' };
+var rawWait = '';   /* 버튼에 없는 옛 글자를 지켜 준다 */
+var vStatus = '예정';
+var subDone = false;   /* 접수 완료 체크 */
+var MAP = null, MARKERS = [];
+
+var SEG_OPTS = {
+  sameday: ['가능', '불가능'],
+  prereq:  ['유선', '팩스', '인터넷', '불가능'],
+  parking: ['가능', '인근'],
+  wait:    ['10분 내외', '30분 내외', '1시간 내외', '1시간 초과', '우편·등기']
+};
+var SEG_LABEL = { sameday: '당일발급', prereq: '사전신청', parking: '주차', wait: '발급소요' };
+
+/* 점심시간 빠른 고르기. 오후 시각만 넣어 두어 오전으로 잘못 잡히는 일을 막는다. */
+var LUNCH_QUICK = ['12:00-13:00', '12:30-13:30', '13:00-14:00'];
+
+/* 방문일정 탭은 오늘 기준 이 일수 전까지만 보여준다 */
+var APP_VER = 'v29';   /* 화면 맨 아래에 표시된다 */
+var VISIT_DAYS_BACK = 3;
+/* 네이버 지도: 목적지 1 + 경유지 5 = 한 번에 최대 6곳 (실측 확인됨) */
+var NAV_MAX_STOPS = 6;
+
+/* ---------- 공통 ---------- */
+var toastTimer = null;
+function toast(msg, ms) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';   /* white-space: pre-line 로 줄바꿈 표시 */
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.style.display = 'none'; }, ms || 2200);
+}
+/* 검색은 대문자·소문자를 가리지 않는다 */
+function lc_(s) { return String(s == null ? '' : s).toLowerCase(); }
+function hit_(hay, q) { return lc_(hay).indexOf(q) > -1; }
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+/* ---------- 창 열고 닫기 · 뒤로가기 ----------
+   창이 열릴 때 뒤로가기 한 칸을 만들어 둔다.
+   그래야 휴대폰에서 뒤로 밀었을 때 앱이 꺼지지 않고 창만 닫힌다. */
+var SHEETS_BACK = ['visitForm', 'picker', 'form', 'gasSheet', 'mapSheet'];
+var SHEET_DEPTH = 0, SKIP_POP = 0, EXIT_ARMED = false;
+
+function topSheet_() {
+  for (var i = 0; i < SHEETS_BACK.length; i++) {
+    var e = document.getElementById(SHEETS_BACK[i]);
+    if (e && e.style.display === 'block') return SHEETS_BACK[i];
+  }
+  return null;
+}
+function pushGuard_() { try { history.pushState({ hdb: 1 }, ''); } catch (e) {} }
+
+function closeSheet(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  var was = (el.style.display === 'block');
+  el.style.display = 'none';
+  if (was && SHEETS_BACK.indexOf(id) > -1 && SHEET_DEPTH > 0) {
+    SHEET_DEPTH--; SKIP_POP++;
+    try { history.back(); } catch (e) { SKIP_POP--; }
+  }
+}
+function openSheet(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  if (el.style.display !== 'block' && SHEETS_BACK.indexOf(id) > -1) {
+    SHEET_DEPTH++; pushGuard_();
+  }
+  el.style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+window.addEventListener('popstate', function () {
+  if (SKIP_POP > 0) { SKIP_POP--; return; }
+  var top = topSheet_();
+  if (top) {                       /* 창이 열려 있으면 창만 닫는다 */
+    document.getElementById(top).style.display = 'none';
+    if (SHEET_DEPTH > 0) SHEET_DEPTH--;
+    return;
+  }
+  if (EXIT_ARMED) {                /* 두 번째 뒤로 → 진짜로 나간다 */
+    EXIT_ARMED = false;
+    try { history.back(); } catch (e) {}
+    return;
+  }
+  EXIT_ARMED = true;               /* 첫 번째 뒤로 → 안내만 */
+  toast('한 번 더 누르면 종료됩니다', 2000);
+  pushGuard_();
+  setTimeout(function () { EXIT_ARMED = false; }, 2000);
+});
+
+function todayStr() {
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+}
+/* 방문 등록은 보통 전날 저녁에 하므로 다음 날을 기본으로 둔다 */
+function tomorrowStr() {
+  var d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+}
+function dayLabel(ds) {
+  if (!ds) return '미정';
+  ds = esc(String(ds));
+  var d = new Date(ds + 'T00:00:00');
+  var w = ['일','월','화','수','목','금','토'][d.getDay()];
+  var base = ds.slice(5).replace('-', '.') + ' (' + w + ')';
+  var t = todayStr();
+  if (ds === t) return base + ' 오늘';
+  if ((d - new Date(t + 'T00:00:00')) === 86400000) return base + ' 내일';
+  return base;
+}
+function withinWindow(ds) {
+  if (!ds) return true;
+  var t = new Date(ds + 'T00:00:00').getTime();
+  if (isNaN(t)) return true;
+  var today = new Date(todayStr() + 'T00:00:00').getTime();
+  return t >= today - VISIT_DAYS_BACK * 86400000;
+}
+
+/* ---------- 서버 통신 (JSONP) ---------- */
+var API = 'https://script.google.com/macros/s/AKfycbzblnGALj9dZqDHq6tNTlDsU4FWF9SPN2Kwtg5oe3zwGAbYQhQygUPcIoILhScGZisa/exec';
+var CODE = '', ME = '', _seq = 0;
+try { CODE = localStorage.getItem('hdb_code') || ''; } catch (e) { CODE = ''; }
+
+function jsonp(params, ok, fail, waitMs) {
+  var cb = '__cb' + (++_seq) + '_' + Date.now();
+  var url = API + '?cb=' + cb + '&code=' + encodeURIComponent(CODE);
+  for (var k in params) url += '&' + k + '=' + encodeURIComponent(params[k]);
+
+  var sc = document.createElement('script'), done = false;
+  var timer = setTimeout(function () {
+    finish(null, { message: '응답이 없습니다. 통신 상태를 확인하세요.' });
+  }, waitMs || 25000);
+
+  function finish(res, err) {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    try { delete window[cb]; } catch (e) { window[cb] = undefined; }
+    if (sc.parentNode) sc.parentNode.removeChild(sc);
+    if (err) { fail(err); return; }
+    if (res && res.ok) ok(res);
+    else if (res && res.err === 'AUTH') authFail();
+    else fail({ message: (res && res.err) || '알 수 없는 오류' });
+  }
+
+  window[cb] = function (res) { finish(res, null); };
+  sc.onerror = function () { finish(null, { message: '서버에 연결하지 못했습니다.' }); };
+  sc.src = url;
+  document.head.appendChild(sc);
+}
+
+/* 서버 호출을 한 곳에 모아둔다 */
+function srv() {
+  var ok = function () {};
+  var fail = function (e) { toast('실패: ' + e.message, 5200); };
+  var r = {};
+  r.then = function (f) { ok = f; return r; };
+  r.err  = function (f) { fail = f; return r; };
+  r.all         = function ()       { jsonp({fn:'all'}, function (s) { ok(s); }, fail); return r; };
+  r.saveHosp    = function (d)      { jsonp({fn:'saveHospital', data:JSON.stringify(d)}, function (s) { ok(s.res); }, fail); return r; };
+  r.delHosp     = function (id)     { jsonp({fn:'delHospital', id:id}, function () { ok(); }, fail); return r; };
+  r.saveVisit   = function (d)      { jsonp({fn:'saveVisit', data:JSON.stringify(d)}, function (s) { ok(s.id); }, fail); return r; };
+  r.setStatus   = function (id, st) { jsonp({fn:'setStatus', id:id, status:st}, function () { ok(); }, fail); return r; };
+  r.delVisit    = function (id)     { jsonp({fn:'delVisit', id:id}, function () { ok(); }, fail); return r; };
+  r.reorder     = function (ids)    { jsonp({fn:'reorder', ids:ids.join(',')}, function () { ok(); }, fail); return r; };
+  r.geo         = function (q)      { jsonp({fn:'geo', q:q}, function (s) { ok(s); }, fail); return r; };
+  r.fuel        = function (pts, k) { jsonp({fn:'fuel', pts:pts, kind:k}, function (s) { ok(s.res); }, fail, 60000); return r; };
+  /* 첫 계산은 구간을 수십 개 물어봐야 해서 오래 걸린다. 넉넉히 기다린다. */
+  r.times       = function (pts, f, t) { jsonp({fn:'times', pts:pts, from:f||'', to:t||''}, function (s) { ok(s.res); }, fail, 90000); return r; };
+  return r;
+}
+
+/* ---------- 조사자 확인 ---------- */
+function showLogin(msg) {
+  var m = document.getElementById('l_msg');
+  m.className = ''; m.textContent = msg || '';
+  document.getElementById('l_code').value = '';
+  openSheet('login');
+}
+function authFail() {
+  try { localStorage.removeItem('hdb_code'); } catch (e) {}
+  CODE = '';
+  showLogin('코드가 맞지 않습니다.');
+}
+/* 확인과 데이터 받기를 한 번에 처리한다 (왕복 2회 -> 1회) */
+function doLogin() {
+  var v = document.getElementById('l_code').value.trim();
+  var m = document.getElementById('l_msg');
+  if (!v) { m.className = ''; m.textContent = '코드를 입력하세요.'; return; }
+  CODE = v;
+  m.className = 'busy'; m.textContent = '확인 중…';
+  srv().then(function (d) {
+      ME = d.name; DB = d.hospitals; VISITS = d.visits;
+      cacheWrite();
+      try { localStorage.setItem('hdb_code', CODE); } catch (e) {}
+      closeSheet('login');
+      toast(ME + '님 확인되었습니다');
+      render();
+    })
+    .err(function (e) { CODE = ''; m.className = ''; m.textContent = e.message; })
+    .all();
+}
+
+/* ---------- 로드 · 캐시 ---------- */
+/* 마지막으로 받은 목록을 기기에 저장해 둔다.
+   다음에 열면 그걸 즉시 보여주고, 새 자료는 뒤에서 받아 바꿔 끼운다. */
+function cacheRead() {
+  try {
+    var s = localStorage.getItem('hdb_cache');
+    if (!s) return null;
+    var c = JSON.parse(s);
+    /* 모양이 이상하면 없는 셈 친다 (예전 형식이거나 저장 중 끊긴 경우) */
+    if (!c || !(c.hospitals instanceof Array) || !(c.visits instanceof Array)) return null;
+    return c;
+  }
+  catch (e) { return null; }
+}
+/* 화면에서 뭔가를 직접 바꿨다는 표시.
+   뒤늦게 도착한 갱신 응답이 이 변경을 덮어쓰지 못하게 한다. */
+var MUT_SEQ = 0, LOAD_SEQ = 0;
+function touch_() { MUT_SEQ++; cacheWrite(); render(); }
+
+function cacheWrite() {
+  try { localStorage.setItem('hdb_cache', JSON.stringify({ hospitals: DB, visits: VISITS })); }
+  catch (e) {}
+}
+
+/* quiet = true 면 화면을 비우지 않고 조용히 갱신한다 */
+function loadAll(quiet) {
+  var mutAt = MUT_SEQ, my = ++LOAD_SEQ;
+  if (!quiet) document.getElementById('list').innerHTML = '<div class="empty">불러오는 중…</div>';
+  srv().then(function (d) {
+        /* 내가 그 사이에 뭔가 바꿨거나, 더 나중에 부른 갱신이 있으면
+           이 응답은 낡은 것이다. 그대로 덮어쓰면 방금 지운 게 되살아난다. */
+        if (my !== LOAD_SEQ || mutAt !== MUT_SEQ) return;
+        ME = d.name || ME;
+        DB = d.hospitals; VISITS = d.visits;
+        cacheWrite(); render();
+      })
+       .err(function (e) { if (quiet) toast('갱신 실패: ' + e.message, 4200); else fail(e); })
+       .all();
+}
+function fail(e) {
+  document.getElementById('list').innerHTML =
+    '<div class="empty">불러오지 못했습니다.<br>' + esc(e.message) + '</div>';
+}
+
+/* 방문 건에 붙은 병원 고유번호로 찾는다. 없으면 이름으로 */
+function findHospital(v) {
+  var hid = (v && v.hid) || '';
+  var name = (v && v.name) || v;
+  var i;
+  if (hid) { for (i = 0; i < DB.length; i++) if (DB[i].id === hid) return DB[i]; }
+  for (i = 0; i < DB.length; i++) if (DB[i].name === name) return DB[i];
+  return null;
+}
+
+/* ---------- 탭 ---------- */
+var TAB_TITLE = { visit: '방문일정', hold: '보류 건', db: '병원 실무정보 DB' };
+
+function paintTabs() {
+  ['visit','hold','db'].forEach(function (k) {
+    var e = document.getElementById('tab_' + k);
+    if (e) e.className = (TAB === k) ? 'on' : '';
+  });
+}
+
+function switchTab(t) {
+  TAB = t;
+  try { localStorage.setItem('hdb_tab', t); } catch (e) {}
+  paintTabs();
+  document.getElementById('search').value = '';
+  render(); window.scrollTo(0, 0);
+}
+
+function onFab() {
+  if (TAB === 'db') openForm();
+  else openPicker();
+}
+
+
+function visitsOf(kind) {
+  return VISITS.filter(function (v) {
+    return kind === 'hold' ? (v.status === '보류') : (v.status !== '보류');
+  });
+}
+
+function paintHoldCount() {
+  var n = visitsOf('hold').length;
+  var el = document.getElementById('holdCnt');
+  el.textContent = n;
+  el.className = n ? 'tabcnt show' : 'tabcnt';
+}
+
+/* ---------- 지도 ---------- */
+function openDayMap(ds) {
+  var items = visitsOf('visit').filter(function (v) {
+    return v.date === ds && v.status !== '완료';
+  });
+  var pts = [], missing = [];
+
+  items.forEach(function (v) {
+    var h = findHospital(v);
+    if (h && h.lat && h.lng) pts.push({ name: v.name, lat: h.lat, lng: h.lng });
+    else missing.push(v.name);
+  });
+
+  if (!pts.length) { toast('남은 방문지 중 좌표가 있는 병원이 없습니다.'); return; }
+
+  document.getElementById('mapTitle').textContent = dayLabel(ds) + ' · ' + pts.length + '곳';
+  openSheet('mapSheet');
+
+  var warn = document.getElementById('mapWarn');
+  if (missing.length) {
+    warn.textContent = '좌표 없음: ' + missing.join(', ');
+    warn.style.display = 'block';
+  } else {
+    warn.style.display = 'none';
+  }
+
+  setTimeout(function () { drawMap(pts); }, 60);
+}
+
+function drawMap(pts) {
+  if (typeof L === 'undefined') { toast('지도를 불러오지 못했습니다 (통신 확인)', 4200); return; }
+  if (!MAP) {
+    MAP = L.map('map', { zoomControl: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap'
+    }).addTo(MAP);
+  }
+  MARKERS.forEach(function (m) { MAP.removeLayer(m); });
+  MARKERS = [];
+
+  var bounds = [];
+  pts.forEach(function (p, i) {
+    var icon = L.divIcon({
+      className: '',
+      html: '<div class="pin">' + (i + 1) + '</div>',
+      iconSize: [28, 28], iconAnchor: [14, 14]
+    });
+    var m = L.marker([p.lat, p.lng], { icon: icon }).addTo(MAP).bindPopup(p.name);
+    MARKERS.push(m);
+    bounds.push([p.lat, p.lng]);
+  });
+
+  MAP.invalidateSize();
+  if (bounds.length === 1) MAP.setView(bounds[0], 14);
+  else MAP.fitBounds(bounds, { padding: [40, 40] });
+}
+
+function closeMap() { closeSheet('mapSheet'); }
+
+/* ---------- 렌더 ---------- */
+/* 제목 옆에 등록 개수를 보여준다. 검색 중이면 '보이는 수 / 전체 수' */
+function paintTitle(shown, total) {
+  var el = document.getElementById('pageTitle');
+  var txt = esc(TAB_TITLE[TAB]);
+  if (total != null) {
+    txt += '<span class="num">' +
+           (shown != null && shown !== total ? shown + ' / ' + total : total) +
+           '</span>';
+  }
+  el.innerHTML = txt;
+}
+
+function render() {
+  paintHoldCount();
+  if (TAB === 'db') renderDB();
+  else if (TAB === 'hold') renderHold();
+  else renderVisits();
+}
+
+/* 당일발급이 되는 것이 보통이므로, 되는 경우에는 아무 표시도 하지 않는다.
+   불가능한 곳만 빨갛게 드러낸다. */
+/* ---------- 지역 (#15 · #20) ----------
+   주소 앞머리를 시/도 + 시·군·구 로 잘라 묶는다.
+   표기가 '서울특별시'든 '서울'이든 같은 묶음으로 간다. */
+var SIDO_MAP = {
+  '서울특별시':'서울','서울시':'서울','서울':'서울',
+  '부산광역시':'부산','부산시':'부산','부산':'부산',
+  '대구광역시':'대구','대구시':'대구','대구':'대구',
+  '인천광역시':'인천','인천시':'인천','인천':'인천',
+  '광주광역시':'광주','광주시':'광주',
+  '대전광역시':'대전','대전시':'대전','대전':'대전',
+  '울산광역시':'울산','울산시':'울산','울산':'울산',
+  '세종특별자치시':'세종','세종시':'세종','세종':'세종',
+  '경기도':'경기','경기':'경기',
+  '강원특별자치도':'강원','강원도':'강원','강원':'강원',
+  '충청북도':'충북','충북':'충북','충청남도':'충남','충남':'충남',
+  '전북특별자치도':'전북','전라북도':'전북','전북':'전북',
+  '전라남도':'전남','전남':'전남',
+  '경상북도':'경북','경북':'경북','경상남도':'경남','경남':'경남',
+  '제주특별자치도':'제주','제주도':'제주','제주':'제주'
+};
+function regionOf(addr) {
+  var t = String(addr || '').trim().split(/\s+/).filter(Boolean);
+  if (!t.length) return { key: '\uffff', label: '주소 없음' };
+  var sido = SIDO_MAP[t[0]] || t[0];
+  var gu = t[1] || '';
+  /* 고양시 일산동구 처럼 시 아래 구가 또 있으면 함께 묶는다 */
+  if (/시$/.test(gu) && t[2] && /구$/.test(t[2])) gu += ' ' + t[2];
+  var label = gu ? (sido + ' ' + gu) : sido;
+  return { key: label, label: label };
+}
+
+function recCls(h, extra) {
+  var c = 'rec';
+  if (h && h.sameday === '불가능') c += ' r-no';
+  return extra ? (c + ' ' + extra) : c;
+}
+
+function isOld(d) {
+  if (!d) return false;
+  var t = new Date(d).getTime();
+  if (isNaN(t)) return false;
+  return (Date.now() - t) > 1000 * 60 * 60 * 24 * 180;
+}
+
+/* 사전신청 배지: 되는 곳은 초록, 안 되는 곳은 빨강 */
+
+/* 방문 메모에 '접수완료' 표시가 있는지 */
+function isSubmitted(v) {
+  return String((v && v.memo) || '').indexOf(DONE_MARK) > -1;
+}
+/* 화면에 보여줄 메모 (표시는 떼고) */
+function plainMemo(v) {
+  return String((v && v.memo) || '').split(DONE_MARK).join('').trim();
+}
+
+/* 주차 '인근'인 병원의 주차장 좌표가 등록돼 있는지 */
+function hasParkPoint(h) { return !!(h && h.pLat && h.pLng); }
+
+/* 당일발급 표시: 가능하면 아무것도 안 띄운다 */
+/* 대부분이 '당일발급 가능'이라, 안 되는 곳만 알린다. */
+function samedayTag(h) {
+  if (h.sameday === '불가능') return '<div class="tag no">당일발급 불가</div>';
+  return '';
+}
+
+
+/* 나머지 항목은 한 줄로 이어 붙여 카드를 낮춘다 */
+/* #14 발급 소요: 10분대 초록 · 30분대 검정 · 1시간 이상 빨강 */
+function waitCls_(v) {
+  var t = String(v || '');
+  if (!t) return '';
+  if (/우편|등기/.test(t)) return '';
+  var m = parseWait(t);
+  if (m == null) return '';
+  if (m <= 15) return ' class="yes"';
+  if (m <= 45) return '';
+  return ' class="no"';
+}
+
+function metaLine(h, opt) {
+  opt = opt || {};
+  var out = [];
+  /* hl 이 참이면 '되는 경우'를 초록으로 강조한다 (사전신청은 되는 곳이 드물어서) */
+  function add(k, v, hl) {
+    if (!v) return;
+    var cls = '';
+    if (v === '불가능') cls = ' class="no"';
+    else if (hl) cls = ' class="yes"';
+    out.push('<span><i>' + k + '</i><b' + cls + '>' + esc(v) + '</b></span>');
+  }
+  /* 사전신청은 되는 곳이 드물다. 되는 곳만 초록으로 알리고 '불가능'은 적지 않는다. */
+  if (h.prereq && h.prereq !== '불가능') add('사전신청', h.prereq, true);
+  /* 주차가 '인근'인데 주차장 주소가 없으면 길찾기를 할 수 없으므로 미리 알린다 */
+  if (h.parking === '인근' && !hasParkPoint(h)) {
+    out.push('<span><i>주차</i><b class="no">인근 · 주소 없음</b></span>');
+  } else {
+    add('주차', h.parking);
+  }
+  /* '접수 후 대기'는 화면에 적지 않는다. 병원DB 입력 칸에서만 체크하고,
+     동선 계산에서 최단시간에 반영하는 용도로만 쓴다. */
+  if (h.wait) out.push('<span><i>발급</i><b' + waitCls_(h.wait) + '>' + esc(h.wait) + '</b></span>');
+  add('진료', h.open);
+  add('점심', h.lunch);
+  if (opt.checked) {
+    out.push('<span class="chk' + (isOld(h.checked) ? ' old' : '') + '">' +
+             (h.checked ? '확인 ' + esc(h.checked) : '확인일 없음') + '</span>');
+  }
+  if (!out.length) return '';
+  return '<div class="meta">' + out.join('<span class="sep">·</span>') + '</div>';
+}
+
+function infoBlock(h) {
+  if (!h) return '<div class="missing">병원DB에 없는 병원입니다</div>';
+  return (h.addr ? '<div class="addr">' + esc(h.addr) + '</div>' : '') +
+         samedayTag(h) + metaLine(h);
+}
+
+/* 완료된 방문: 카드는 그대로, 회색으로 흐리게 + 날짜 그룹 안 맨 아래로 */
+function doneCard(v) {
+  var h = findHospital(v);
+  return '<div class="' + recCls(h, 'done') + '">' +
+    '<div class="donehead">' +
+      '<h2>' + esc(v.name) + '</h2>' +
+      '<button class="undo" onclick="undoVisit(\'' + v.id + '\')">되돌리기</button>' +
+    '</div>' +
+    infoBlock(h) +
+    (v.memo ? '<div class="memo">' + esc(v.memo) + '</div>' : '') +
+  '</div>';
+}
+
+function renderVisits() {
+  paintTitle();
+  var q = lc_(document.getElementById('search').value.trim());
+  var pool = visitsOf('visit');
+  var all = pool.filter(function (v) { return withinWindow(v.date); });
+  var hidden = pool.length - all.length;
+  var list = all.filter(function (v) { return !q || hit_(v.name, q); });
+  var el = document.getElementById('list');
+
+  if (!list.length) {
+    var msg;
+    if (all.length) msg = '검색 결과가 없습니다.';
+    else if (hidden) msg = '표시할 일정이 없습니다.<br>' + VISIT_DAYS_BACK +
+                           '일 이전 일정 ' + hidden + '건은 숨겨져 있습니다.';
+    else msg = '예정된 방문이 없습니다.<br>+ 를 눌러 병원을 고르세요.';
+    el.innerHTML = '<div class="empty">' + msg + '</div>';
+    PLAN = null;
+    return;
+  }
+
+  var order = [], seen = {};
+  list.forEach(function (v) {
+    var k = v.date || '';
+    if (!seen[k]) { seen[k] = { date: v.date, todo: [], done: [] }; order.push(seen[k]); }
+    (v.status === '완료' ? seen[k].done : seen[k].todo).push(v);
+  });
+
+  /* #18 늦은 날짜가 위로 온다. 앞날 → 오늘 → 지난 날 (오래될수록 더 아래).
+     날짜 미정은 맨 뒤. */
+  order.sort(function (a, b) {
+    var x = a.date || '', y = b.date || '';
+    if (!x && !y) return 0;
+    if (!x) return 1;
+    if (!y) return -1;
+    if (x === y) return 0;
+    return x > y ? -1 : 1;
+  });
+
+  /* 다시 그리기 전에 입력 중이던 출발 주소를 챙겨 둔다 */
+  var ab = document.getElementById('addrBox'), keepAddr = '', keepOpen = false;
+  if (ab) {
+    keepOpen = (ab.style.display === 'block');
+    var ai = document.getElementById('p_addr');
+    if (ai) keepAddr = ai.value;
+  }
+
+  var html = '';
+  order.forEach(function (g) {
+    var isToday = (g.date === todayStr());
+    var cnt = g.todo.length + '곳 남음';
+    if (g.done.length) cnt += ' · ' + g.done.length + '곳 완료';
+
+    html += '<div class="dayhead' + (isToday ? ' today' : '') + '">' +
+            dayLabel(g.date) + ' <span class="cnt">' + cnt + '</span>' +
+            '<button class="mapbtn" onclick="openDayMap(\'' + esc(String(g.date || '')).replace(/'/g, '') + '\')">지도</button></div>';
+
+    /* 오늘·앞으로의 날짜에는 출발지·계산 줄을 붙이고,
+       계산돼 있으면 그 날짜의 순서로 보여준다 */
+    if (planDay_(g.date) && !q && g.todo.length) {
+      html += planBar(g.date);
+      if (planUsable(g.date)) {
+        var body = planBody(g.date);
+        if (body) {
+          html += body;
+          g.done.forEach(function (v) { html += doneCard(v); });
+          return;
+        }
+      } else if (PLAN && PLAN.date === g.date && PLAN.err) {
+        html += '<div class="planwarn">' + esc(PLAN.err) + '</div>';
+      } else if (PLAN && PLAN.date === g.date) {
+        html += '<div class="planwarn">방문 목록이 바뀌었습니다. 다시 계산해 주세요.</div>';
+      }
+    }
+
+    g.todo.sort(function (a, b) {
+      var x = a.order || 9999, y = b.order || 9999;
+      if (x !== y) return x - y;
+      return a.name.localeCompare(b.name, 'ko');
+    });
+
+    g.todo.forEach(function (v, idx) {
+      var h = findHospital(v);
+      var first = (idx === 0), lastOne = (idx === g.todo.length - 1);
+      html += '<div class="' + recCls(h) + '">' +
+        '<div class="ordhead">' +
+          '<span class="ordnum">' + (idx + 1) + '</span>' +
+          '<h2>' + esc(v.name) + '</h2>' +
+          '<div class="ordbtns">' +
+            '<button onclick="moveVisit(\'' + v.id + '\',-1)"' + (first ? ' disabled' : '') + '>▲</button>' +
+            '<button onclick="moveVisit(\'' + v.id + '\',1)"' + (lastOne ? ' disabled' : '') + '>▼</button>' +
+          '</div>' +
+        '</div>' +
+        infoBlock(h) +
+        (v.memo ? '<div class="memo">' + esc(v.memo) + '</div>' : '') +
+        '<div class="navrow">' +
+          '<button class="route" onclick="routeOne(\'' + v.id + '\')">🚩 길찾기</button>' +
+          (idx > 0 && idx < NAV_MAX_STOPS
+             ? '<button class="route" onclick="routeTo(\'' + v.id + '\')">🚩 여기까지</button>' : '') +
+        '</div>' +
+        '<div class="foot">' +
+          '<button class="small" onclick="doneVisit(\'' + v.id + '\')">완료</button>' +
+          '<button class="hold small" onclick="holdVisit(\'' + v.id + '\')">보류</button>' +
+          '<button class="ghost small" onclick="openVisitForm(\'' + v.id + '\')">수정</button>' +
+        '</div></div>';
+    });
+
+    g.done.forEach(function (v) { html += doneCard(v); });
+  });
+
+  el.innerHTML = html;
+
+  if (keepOpen || keepAddr) {
+    var b2 = document.getElementById('addrBox');
+    if (b2) b2.style.display = 'block';
+    var i2 = document.getElementById('p_addr');
+    if (i2) i2.value = keepAddr;
+  }
+}
+
+/* ---------- 보류 탭 ---------- */
+function renderHold() {
+  paintTitle();
+  var q = lc_(document.getElementById('search').value.trim());
+  var all = visitsOf('hold');
+  var list = all.filter(function (v) { return !q || hit_(v.name, q); });
+  var el = document.getElementById('list');
+
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">' +
+      (all.length ? '검색 결과가 없습니다.' : '보류 중인 건이 없습니다.') + '</div>';
+    return;
+  }
+
+  el.innerHTML = list.map(function (v) {
+    var h = findHospital(v);
+    var dateTxt = v.date ? dayLabel(v.date) + ' 재방문' : '재방문일 미정';
+    return '<div class="' + recCls(h, 'r-hold') + '">' +
+      '<h2>' + esc(v.name) + '</h2>' +
+      '<div class="holddate' + (v.date ? '' : ' tbd') + '">' + dateTxt + '</div>' +
+      infoBlock(h) +
+      (v.memo ? '<div class="memo">' + esc(v.memo) + '</div>' : '') +
+      '<div class="foot">' +
+        '<button class="small" onclick="resumeVisit(\'' + v.id + '\')">일정 복귀</button>' +
+        '<button class="ghost small" onclick="openVisitForm(\'' + v.id + '\')">수정</button>' +
+      '</div></div>';
+  }).join('');
+}
+
+function renderDB() {
+  var q = lc_(document.getElementById('search').value.trim());
+  var list = DB.filter(function (h) {
+    return !q || hit_(h.name, q) || hit_(h.addr, q);
+  });
+
+  /* 지역(시·도 → 시·군·구)으로 묶고, 그 안에서는 병원 이름 가나다순.
+     주소가 없는 병원은 맨 뒤로 보낸다. (#15 · #20) */
+  list.forEach(function (h) { h._rg = regionOf(h.addr); });
+  list.sort(function (a, b) {
+    if (a._rg.key !== b._rg.key) return a._rg.key.localeCompare(b._rg.key, 'ko');
+    return a.name.localeCompare(b.name, 'ko');
+  });
+
+  paintTitle(list.length, DB.length);
+  var el = document.getElementById('list');
+
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">' +
+      (DB.length ? '검색 결과가 없습니다.'
+                 : '등록된 병원이 없습니다.<br>+ 를 눌러 추가하세요.') + '</div>';
+    return;
+  }
+
+  /* 같은 지역끼리 세어서 구분줄을 올린다 */
+  var cntBy = {};
+  list.forEach(function (h) { cntBy[h._rg.key] = (cntBy[h._rg.key] || 0) + 1; });
+
+  var lastRg = null;
+  el.innerHTML = list.map(function (h) {
+    var head = '';
+    if (h._rg.key !== lastRg) {
+      lastRg = h._rg.key;
+      head = '<div class="rhead">' + esc(h._rg.label) +
+             '<span class="cnt">' + cntBy[h._rg.key] + '곳</span></div>';
+    }
+    return head + '<div class="' + recCls(h) + '">' +
+      '<div class="dbhead">' +
+        '<h2>' + esc(h.name) + '</h2>' +
+        '<button class="edit" onclick="openForm(\'' + h.id + '\')">수정</button>' +
+      '</div>' +
+      (h.addr ? '<div class="addr">' + esc(h.addr) + '</div>' : '') +
+      samedayTag(h) + metaLine(h, { checked: true, skipStay: true }) +
+      (h.memo ? '<div class="memo">' + esc(h.memo) + '</div>' : '') +
+    '</div>';
+  }).join('') + '<div class="ver" id="verLine" onclick="verTap()" ' +
+    'oncontextmenu="forceUpdate();return false">' + APP_VER + ' · ' + VER_STATE + '</div>';
+}
+
+/* ---------- seg ---------- */
+function buildSeg(key) {
+  var box = document.getElementById('seg_' + key);
+  box.innerHTML = SEG_OPTS[key].map(function (o) {
+    return '<button type="button" onclick="pick(\'' + key + '\',\'' + o + '\')">' + o + '</button>';
+  }).join('');
+  paintSeg(key);
+}
+function pick(key, val) {
+  seg[key] = (seg[key] === val) ? '' : val;
+  paintSeg(key);
+  if (key === 'parking') paintParkAddr();
+  if (key === 'wait' && seg.wait) rawWait = '';
+}
+
+function toggleStay() { stayWait = !stayWait; paintStay(); }
+function paintStay() {
+  document.getElementById('f_stay').className = stayWait ? 'chkrow on' : 'chkrow';
+}
+
+/* 주차장 주소 칸은 주차가 '인근'일 때만 띄운다.
+   이미 입력해 둔 값이 있으면 '가능'으로 바꿔도 계속 보여 준다. */
+function paintParkAddr() {
+  var box = document.getElementById('paddrRow');
+  var has = document.getElementById('f_paddr').value.trim();
+  box.style.display = (seg.parking === '인근' || has) ? 'block' : 'none';
+}
+function paintSeg(key) {
+  var box = document.getElementById('seg_' + key);
+  Array.prototype.forEach.call(box.children, function (b) {
+    b.className = (b.textContent === seg[key]) ? 'sel' : '';
+  });
+}
+
+/* ---------- 점심시간 ---------- */
+function toggleLunchNone() {
+  lunchNone = !lunchNone;
+  if (lunchNone) {
+    document.getElementById('f_lunch_s').value = '';
+    document.getElementById('f_lunch_e').value = '';
+  }
+  paintLunch();
+}
+function onLunchTime() {
+  fixAfternoon_();
+  if (document.getElementById('f_lunch_s').value || document.getElementById('f_lunch_e').value) {
+    lunchNone = false;
+  }
+  paintLunch();
+}
+function paintLunch() {
+  document.getElementById('lunchNone').className = lunchNone ? 'sel' : '';
+  var now = lunchNone ? '없음' : lunchValue();
+  var box = document.getElementById('lunchQuick');
+  if (box) Array.prototype.forEach.call(box.children, function (b) {
+    b.className = (b.textContent === now) ? 'sel' : '';
+  });
+}
+
+/* 점심시간은 거의 낮 12~2시다. 빠른 단추로 고르면 오전으로 잘못 잡힐 일이 없다. */
+function buildLunchQuick() {
+  var box = document.getElementById('lunchQuick');
+  if (!box) return;
+  box.innerHTML = LUNCH_QUICK.map(function (o) {
+    return '<button type="button" onclick="pickLunch(\'' + o + '\')">' + o + '</button>';
+  }).join('');
+}
+function pickLunch(v) {
+  if (lunchValue() === v && !lunchNone) { setLunch(''); return; }
+  lunchNone = false; setLunch(v);
+}
+
+/* 12시 이전으로 잡힌 점심은 오전이 아니라 오후일 가능성이 훨씬 크다.
+   00~06시로 들어오면 오후로 바로잡고 알려 준다. (#9) */
+function fixAfternoon_() {
+  var s = document.getElementById('f_lunch_s'), e = document.getElementById('f_lunch_e');
+  var moved = false;
+  [s, e].forEach(function (el) {
+    var m = String(el.value || '').match(/^(\d{2}):(\d{2})$/);
+    if (!m) return;
+    var hh = Number(m[1]);
+    if (hh >= 1 && hh <= 6) { el.value = ('0' + (hh + 12)).slice(-2) + ':' + m[2]; moved = true; }
+  });
+  if (moved) toast('점심시간을 오후로 맞췄습니다', 3000);
+}
+function lunchValue() {
+  if (lunchNone) return '없음';
+  var s = document.getElementById('f_lunch_s').value;
+  var e = document.getElementById('f_lunch_e').value;
+  if (!s && !e && rawLunch) return rawLunch;   /* 못 읽은 원래 글자를 지운 채로 저장하지 않는다 */
+  if (s && e) return s + '-' + e;
+  if (s) return s + '-';
+  if (e) return '-' + e;
+  return '';
+}
+function setLunch(v) {
+  var s = document.getElementById('f_lunch_s'), e = document.getElementById('f_lunch_e');
+  s.value = ''; e.value = ''; lunchNone = false; rawLunch = '';
+  var txt = String(v || '').trim();
+
+  if (txt === '없음') { lunchNone = true; paintLunch(); return; }
+  if (!txt) { paintLunch(); return; }
+
+  var p = txt.split('-');
+  if (p.length === 2) {
+    s.value = normTime_(p[0]);
+    e.value = normTime_(p[1]);
+  }
+  /* 두 칸 모두 제대로 못 읽었으면 원래 글자를 지켜준다 */
+  if (!s.value && !e.value) rawLunch = txt;
+  paintLunch();
+}
+/* 'HH:MM' 으로 확실히 읽히는 것만 통과시킨다.
+   '09:00~18:00' 같은 글자를 억지로 시각으로 바꾸면 엉뚱한 값이 저장된다. */
+function normTime_(v) {
+  var m = String(v || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return '';
+  var hh = Number(m[1]), mm = Number(m[2]);
+  if (hh > 23 || mm > 59) return '';
+  return ('0' + hh).slice(-2) + ':' + ('0' + mm).slice(-2);
+}
+
+/* ---------- 병원 폼 ---------- */
+function openForm(id) {
+  editId = id || null;
+  var h = id ? DB.filter(function (x) { return x.id === id; })[0] : null;
+
+  document.getElementById('formTitle').textContent = h ? '병원 수정' : '병원 추가';
+  document.getElementById('f_name').value = h ? h.name : '';
+  document.getElementById('f_addr').value = h ? h.addr : '';
+  document.getElementById('f_memo').value = h ? h.memo : '';
+
+  /* 발급 소요시간은 이제 단추로 고른다.
+     단추에 없는 옛 글자는 지워지지 않게 그대로 지켜 둔다. (#5) */
+  var waitTxt = h ? String(h.wait || '') : '';
+  var known = SEG_OPTS.wait.indexOf(waitTxt) > -1;
+  seg.wait = known ? waitTxt : '';
+  rawWait = (waitTxt && !known) ? waitTxt : '';
+  /* 시트에 '9시', '09:00~18:00' 처럼 적혀 있으면 시각칸이 못 읽는다.
+     그 글자를 기억해 두었다가, 사용자가 손대지 않으면 그대로 지켜준다. */
+  var openTxt = h ? String(h.open || '') : '';
+  var openOk = normTime_(openTxt);
+  rawOpen = (openTxt && !openOk) ? openTxt : '';
+  document.getElementById('f_open').value = openOk;
+  document.getElementById('f_paddr').value = h ? (h.pAddr || '') : '';
+  stayWait = h ? !!h.stay : false;
+  paintStay();
+
+  var lunchTxt = h ? String(h.lunch || '') : '';
+  rawLunch = '';
+  seg.sameday = h ? h.sameday : '';
+  seg.prereq  = h ? h.prereq : '';
+  seg.parking = h ? h.parking : '';
+  buildSeg('sameday'); buildSeg('prereq'); buildSeg('parking'); buildSeg('wait');
+  buildLunchQuick();
+  paintParkAddr();
+  setLunch(lunchTxt);
+
+  var rn = document.getElementById('rawNote'), warn = [];
+  if (rawOpen) warn.push('진료시작 “' + esc(rawOpen) + '”');
+  if (rawLunch) warn.push('점심시간 “' + esc(rawLunch) + '”');
+  if (rawWait) warn.push('발급소요 “' + esc(rawWait) + '”');
+  if (warn.length) {
+    rn.innerHTML = warn.join(' · ') + ' 는 화면 칸이 읽지 못한 값입니다.<br>' +
+                   '그대로 두면 원래 값이 유지되고, 새로 고르면 바뀝니다.';
+    rn.style.display = 'block';
+  } else { rn.style.display = 'none'; }
+
+  document.getElementById('delBtn').style.display = h ? 'block' : 'none';
+  openSheet('form');
+}
+
+/* 저장은 기다리지 않는다. 창을 바로 닫고 서버에는 뒤에서 보낸다. */
+function saveHospital_() {
+  var name = document.getElementById('f_name').value.trim();
+  if (!name) { toast('병원명을 입력하세요'); return; }
+
+  var payload = {
+    id: editId, name: name,
+    addr: document.getElementById('f_addr').value.trim(),
+    sameday: seg.sameday, prereq: seg.prereq,
+    wait: seg.wait || rawWait,
+    open: document.getElementById('f_open').value || rawOpen,
+    lunch: lunchValue(), parking: seg.parking,
+    pAddr: document.getElementById('f_paddr').value.trim(),
+    stay: stayWait ? 1 : '',
+    memo: document.getElementById('f_memo').value.trim()
+  };
+
+  closeSheet('form');
+  toast('저장 중…');
+  srv().then(function (res) {
+      if (res && res.warn) toast('저장됨 · ' + res.warn, 5200);
+      else toast('저장됨');
+      loadAll(true);
+    })
+    .err(function (e) { toast('저장 실패 · ' + e.message, 5600); loadAll(true); })
+    .saveHosp(payload);
+}
+
+function delHospital_() {
+  if (!editId) return;
+  if (!confirm('삭제할까요?')) return;
+  var id = editId;
+  closeSheet('form');
+  DB = DB.filter(function (x) { return x.id !== id; });
+  touch_();
+  toast('삭제됨');
+  srv().then(function () { loadAll(true); })
+       .err(function (e) { toast('삭제 실패 · ' + e.message, 5600); loadAll(true); })
+       .delHosp(id);
+}
+
+/* ---------- 병원 선택 ---------- */
+function openPicker() {
+  document.getElementById('pickSearch').value = '';
+  renderPicker(); openSheet('picker');
+}
+function renderPicker() {
+  var q = lc_(document.getElementById('pickSearch').value.trim());
+  var list = DB.filter(function (h) {
+    return !q || hit_(h.name, q) || hit_(h.addr, q);
+  });
+  var el = document.getElementById('pickList');
+  if (!list.length) { el.innerHTML = '<div class="empty">병원DB 탭에서 먼저 등록하세요.</div>'; return; }
+  el.innerHTML = list.map(function (h) {
+    return '<div class="pickitem" onclick="chooseHospital(\'' + h.id + '\')">' +
+      esc(h.name) + '<small>' + esc(h.addr) + '</small></div>';
+  }).join('');
+}
+function chooseHospital(hid) { closeSheet('picker'); openVisitForm(null, hid); }
+
+/* ---------- 방문 폼 ---------- */
+function toggleTbd() {
+  dateTbd = !dateTbd;
+  if (dateTbd) document.getElementById('v_date').value = '';
+  paintTbd();
+}
+function onVisitDate() {
+  if (document.getElementById('v_date').value) { dateTbd = false; paintTbd(); }
+}
+function paintTbd() { document.getElementById('dateTbd').className = dateTbd ? 'sel' : ''; }
+
+function openVisitForm(id, presetHid) {
+  if (id && pending_(id)) return;
+  vEditId = id || null;
+  var v = id ? VISITS.filter(function (x) { return x.id === id; })[0] : null;
+  var preset = presetHid ? DB.filter(function (x) { return x.id === presetHid; })[0] : null;
+  vHid = v ? (v.hid || '') : (preset ? preset.id : '');
+
+  document.getElementById('visitTitle').textContent = v ? '방문 수정' : '방문 등록';
+  document.getElementById('v_name').value = v ? v.name : (preset ? preset.name : '');
+  subDone = v ? isSubmitted(v) : false;
+  document.getElementById('v_memo').value = v ? plainMemo(v) : '';
+  paintSub();
+
+  /* 새로 등록할 때는 다음 날을 기본으로 넣어 둔다 */
+  var d = v ? v.date : tomorrowStr();
+  document.getElementById('v_date').value = d;
+  dateTbd = (v && !d) ? true : false;
+  paintTbd();
+
+  /* 상태는 화면에서 고르지 않는다. 새로 등록하면 '예정',
+     수정할 때는 원래 상태를 그대로 둔다. 완료/보류는 카드의 버튼으로 바꾼다. */
+  vStatus = v ? v.status : '예정';
+
+  document.getElementById('vDelBtn').style.display = v ? 'block' : 'none';
+  openSheet('visitForm');
+}
+
+/* 같은 날짜 그룹의 맨 뒤 순번 */
+function nextOrder(date) {
+  var n = 0;
+  VISITS.forEach(function (x) {
+    if ((x.date || '') === (date || '') && x.status !== '완료' && (x.order || 0) > n) n = x.order;
+  });
+  return n + 1;
+}
+
+/* 아직 서버에 저장되지 않은 카드인지 확인한다.
+   저장이 끝나기 전에 완료·보류·순서변경을 누르면 엉뚱한 곳에 저장되므로 막는다. */
+function pending_(id) {
+  if (String(id).indexOf('tmp_') === 0) {
+    toast('저장 중입니다. 잠시 후 다시 눌러 주세요.', 3000);
+    return true;
+  }
+  return false;
+}
+
+/* 저장을 기다리지 않는다. 목록에 먼저 반영하고 서버에는 뒤에서 보낸다.
+   실패하면 원래대로 되돌린다. */
+function toggleSub() { subDone = !subDone; paintSub(); }
+function paintSub() {
+  document.getElementById('v_sub').className = subDone ? 'chkrow on' : 'chkrow';
+}
+
+function saveVisit_() {
+  var name = document.getElementById('v_name').value.trim();
+  if (!name) { toast('병원을 선택하세요'); return; }
+
+  var date = dateTbd ? '' : document.getElementById('v_date').value;
+  var memo = document.getElementById('v_memo').value.trim();
+  if (subDone) memo = (memo ? memo + ' ' : '') + DONE_MARK;
+
+  var editing = !!vEditId;
+  var rec = null, before = null;
+
+  if (editing) {
+    rec = VISITS.filter(function (x) { return x.id === vEditId; })[0];
+    if (!rec) { toast('대상을 찾지 못했습니다. 새로고침합니다.'); loadAll(true); return; }
+    before = { hid: rec.hid, name: rec.name, date: rec.date, memo: rec.memo, order: rec.order };
+    if ((rec.date || '') !== date) rec.order = nextOrder(date);
+    rec.hid = vHid; rec.name = name; rec.date = date; rec.memo = memo;
+  } else {
+    rec = {
+      id: 'tmp_' + Date.now(), hid: vHid, name: name,
+      date: date, status: vStatus, memo: memo, order: nextOrder(date)
+    };
+    VISITS.push(rec);
+  }
+
+  var payload = {
+    id: editing ? vEditId : null, hid: vHid, name: name,
+    date: date, status: rec.status, memo: memo
+  };
+
+  closeSheet('visitForm');
+  touch_();
+  toast(editing ? '수정됨' : '등록됨');
+
+  srv().then(function (newId) {
+        if (!editing && newId) { rec.id = newId; touch_(); }
+        loadAll(true);
+      })
+      .err(function (e) {
+        if (editing) {
+          rec.hid = before.hid; rec.name = before.name;
+          rec.date = before.date; rec.memo = before.memo; rec.order = before.order;
+        } else {
+          VISITS = VISITS.filter(function (x) { return x.id !== rec.id; });
+        }
+        touch_();
+        toast('저장 실패 · 되돌렸습니다: ' + e.message, 5600);
+        loadAll(true);
+      })
+      .saveVisit(payload);
+}
+
+/* 상태 변경: 화면을 먼저 바꾸고 서버에는 뒤에서 알린다 */
+function setStatusOptimistic(id, next, okMsg) {
+  if (pending_(id)) return;
+  var v = null;
+  for (var i = 0; i < VISITS.length; i++) {
+    if (VISITS[i].id === id) { v = VISITS[i]; break; }
+  }
+  if (!v) return;
+
+  var prev = v.status;
+  v.status = next;
+  touch_();
+
+  srv().then(function () { toast(okMsg); })
+       .err(function (e) {
+         v.status = prev; touch_();
+         toast('실패 · 되돌렸습니다: ' + e.message, 5200);
+         loadAll(true);          /* 서버가 실제로는 바뀌었을 수도 있으니 다시 맞춘다 */
+       })
+       .setStatus(id, next);
+}
+
+/* 같은 날짜 안에서 방문 순서를 한 칸 옮긴다 */
+function moveVisit(id, dir) {
+  if (pending_(id)) return;
+  var v = VISITS.filter(function (x) { return x.id === id; })[0];
+  if (!v) return;
+
+  var group = visitsOf('visit').filter(function (x) {
+    return (x.date || '') === (v.date || '') && x.status !== '완료';
+  });
+  group.sort(function (a, b) {
+    var p = a.order || 9999, q = b.order || 9999;
+    if (p !== q) return p - q;
+    return a.name.localeCompare(b.name, 'ko');
+  });
+
+  var i = group.indexOf(v), j = i + dir;
+  if (i < 0 || j < 0 || j >= group.length) return;
+
+  group[i] = group[j];
+  group[j] = v;
+  group.forEach(function (x, k) { x.order = k + 1; });
+  touch_();
+
+  var ids = group.map(function (x) { return x.id; });
+  if (ids.join(',').indexOf('tmp_') > -1) {
+    /* 저장 중인 카드가 섞여 있으면 서버에 못 보낸다. 곧 새로고침되면서
+       화면이 되돌아가므로, 조용히 넘어가지 말고 알려준다. */
+    toast('저장 중인 일정이 있어 순서가 아직 반영되지 않습니다. 잠시 후 다시 눌러 주세요.', 5200);
+    return;
+  }
+  srv().err(function (e) { toast('순서 저장 실패 · 새로고침합니다: ' + e.message, 5200); loadAll(true); })
+       .reorder(ids);
+}
+
+function holdVisit(id) { setStatusOptimistic(id, '보류', '보류로 이동'); }
+
+/* 접수만 하고 온 경우: 메모에 표시를 남기고 보류로 넘긴다.
+   다음에 일정으로 되돌리면 수령 한 번만 잡힌다. */
+function submitAndHold(id) {
+  if (pending_(id)) return;
+  var v = null;
+  for (var i = 0; i < VISITS.length; i++) if (VISITS[i].id === id) { v = VISITS[i]; break; }
+  if (!v) return;
+
+  var before = { memo: v.memo, status: v.status };
+  if (!isSubmitted(v)) v.memo = (v.memo ? v.memo + ' ' : '') + DONE_MARK;
+  v.status = '보류';
+  touch_();
+  toast('접수함으로 표시하고 보류로 옮겼습니다', 3600);
+
+  srv().then(function () { loadAll(true); })
+       .err(function (e) {
+         v.memo = before.memo; v.status = before.status; touch_();
+         toast('실패 · 되돌렸습니다: ' + e.message, 5200);
+         loadAll(true);
+       })
+       .saveVisit({ id: id, hid: v.hid, name: v.name, date: v.date,
+                    status: '보류', memo: v.memo });
+}
+function doneVisit(id) { setStatusOptimistic(id, '완료', '완료 처리됨'); }
+function undoVisit(id) { setStatusOptimistic(id, '예정', '예정으로 되돌림'); }
+
+function resumeVisit(id) {
+  var v = VISITS.filter(function (x) { return x.id === id; })[0];
+  if (v && !v.date) {
+    toast('재방문일을 먼저 지정하세요');
+    openVisitForm(id);
+    return;
+  }
+  setStatusOptimistic(id, '예정', '방문일정으로 복귀');
+}
+
+function delVisit_() {
+  if (!vEditId || pending_(vEditId)) return;
+  if (!confirm('이 방문 일정을 삭제할까요?')) return;
+  var id = vEditId;
+  closeSheet('visitForm');
+  VISITS = VISITS.filter(function (x) { return x.id !== id; });
+  touch_();
+  toast('삭제됨');
+  srv().then(function () { loadAll(true); })
+       .err(function (e) { toast('삭제 실패 · ' + e.message, 5600); loadAll(true); })
+       .delVisit(id);
+}
+
+
+/* ==================================================================
+   동선 — 오늘 방문할 병원을 어떤 순서로 도는 게 빠른지 계산한다.
+
+   병원마다 상태가 셋: 미방문 → 접수됨 → 완료
+   사전신청이 되는 곳은 미리 신청해 두므로 한 번만 들르면 되고,
+   안 되는 곳은 접수하고 서류가 나올 때까지 기다렸다 수령해야 한다.
+   그 사이에 다른 병원을 도는 게 이득인지까지 같이 따진다.
+   ================================================================== */
+
+var STOP_MIN = 10;          /* 병원 한 번 들르면 쓰는 시간 */
+var DEFAULT_WAIT = 30;      /* 발급소요를 안 적어 둔 병원의 가정값 */
+/* 서류 발급이 가능한 마지막 시각. 이 시각을 넘기는 일정은 짜지 않는다. */
+var DAY_END = 17 * 60 + 30;
+/* 방문 메모에 이 말이 있으면 접수는 끝난 것으로 보고 수령만 잡는다 */
+var DONE_MARK = '[접수완료]';
+var PLAN_MAX = 12;          /* 서버가 한 번에 받아 주는 지점 수와 맞춘다 */
+var PLAN_EXACT = 8;         /* 여기까지는 최적을 찾고, 넘으면 간단한 방법으로 */
+
+var MYLOC = null;           /* 출발 {lat, lng, label} */
+var MYEND = null;           /* 도착 {lat, lng, label, kind} */
+var PLAN_MODE = 'time';     /* 'time' 빨리 끝내기 / 'dist' 적게 움직이기 */
+/* 집·사무실 주소는 이 기기에만 저장한다 (시트에 올리지 않는다) */
+var SPOT_KEY = { home: 'hdb_home', office: 'hdb_office' };
+var SPOT_NAME = { home: '집', office: '사무실' };
+
+function spotGet(kind) {
+  try { var v = localStorage.getItem(SPOT_KEY[kind]); return v ? JSON.parse(v) : null; }
+  catch (e) { return null; }
+}
+function spotSet(kind, obj) {
+  try { localStorage.setItem(SPOT_KEY[kind], JSON.stringify(obj)); } catch (e) {}
+}
+try { PLAN_MODE = localStorage.getItem('hdb_mode') || 'time'; } catch (e) {}
+var PLAN = null;            /* 계산 결과 */
+var PINS = { date: '', ids: [] };   /* '먼저 가기'로 못 박은 방문 id, 누른 차례대로 */
+
+var PLAN_KEY = 'hdb_plan', PIN_KEY = 'hdb_pins', LOC_KEY = 'hdb_loc', END_KEY = 'hdb_end';
+
+/* 짠 동선을 이 기기에 남겨 둔다. 앱을 껐다 켜도 그대로 보인다. (#4) */
+function planSave() {
+  try {
+    if (PLAN && !PLAN.err) localStorage.setItem(PLAN_KEY, JSON.stringify(PLAN));
+    else localStorage.removeItem(PLAN_KEY);
+    localStorage.setItem(PIN_KEY, JSON.stringify(PINS));
+    if (MYLOC && MYLOC.kind === 'addr') localStorage.setItem(LOC_KEY, JSON.stringify(MYLOC));
+    else localStorage.removeItem(LOC_KEY);
+    if (MYEND) localStorage.setItem(END_KEY, JSON.stringify(MYEND));
+    else localStorage.removeItem(END_KEY);
+  } catch (e) {}
+}
+
+function planRestore() {
+  var td = todayStr();
+  try {
+    var e = localStorage.getItem(END_KEY); if (e) MYEND = JSON.parse(e);
+    /* 현재 위치는 시간이 지나면 틀리므로 주소로 넣은 것만 되살린다 */
+    var l = localStorage.getItem(LOC_KEY); if (l) MYLOC = JSON.parse(l);
+    var pn = localStorage.getItem(PIN_KEY);
+    if (pn) { var o = JSON.parse(pn); if (o && o.date && o.date >= td) PINS = o; }
+    var p = localStorage.getItem(PLAN_KEY);
+    if (!p) return;
+    var dd = JSON.parse(p);
+    /* 지난 날짜 계획은 버린다. 어제 짠 길이 오늘 뜨면 더 헷갈린다. */
+    if (!dd || !dd.date || dd.date < td) { localStorage.removeItem(PLAN_KEY); return; }
+    PLAN = dd;
+  } catch (e) {}
+}
+
+function pinList_(date) { return (PINS.date === date) ? (PINS.ids || []) : []; }
+function pinAt_(date, id) { return pinList_(date).indexOf(id); }
+
+/* 카드의 '먼저 가기'. 누르면 앞으로 오고, 다시 누르면 고정이 풀린다. */
+function pinFirst(vid) {
+  if (!PLAN || PLAN.err) return;
+  var ids = pinList_(PLAN.date).slice();
+  var at = ids.indexOf(vid);
+  if (at > -1) ids.splice(at, 1);
+  else ids.push(vid);
+  repin_(ids);
+}
+function clearPins() {
+  if (!PLAN || PLAN.err) return;
+  repin_([]);
+}
+
+/* 고정한 순서에 맞춰 나머지를 다시 잡는다.
+   이동시간 표를 그대로 다시 쓰므로 서버를 부르지 않는다. */
+function repin_(ids) {
+  if (!PLAN || PLAN.err || !PLAN.stops || !PLAN.T) return;
+  var idx = {}, i;
+  for (i = 0; i < PLAN.stops.length; i++) idx[PLAN.stops[i].id] = i;
+  var pins = [];
+  ids.forEach(function (id) { if (idx[id] != null) pins.push(idx[id]); });
+
+  var rt = planWithCutoff(PLAN.stops, PLAN.T, PLAN.start, PLAN_EXACT, 'time', pins);
+  var rd = planWithCutoff(PLAN.stops, PLAN.T, PLAN.start, PLAN_EXACT, 'dist', pins);
+  if (!rt.ok && !rd.ok) {
+    toast('그 순서로는 길을 못 찾았습니다.\n고정을 풀거나 다른 곳을 먼저 잡아 보세요.', 5600);
+    return;
+  }
+  PINS = { date: PLAN.date, ids: ids };
+  PLAN.modes = { time: rt.ok ? rt : null, dist: rd.ok ? rd : null };
+  PLAN.pins = pins;
+  planSave(); render();
+  toast(ids.length ? '고정한 순서에 맞춰 다시 잡았습니다' : '처음부터 다시 잡았습니다', 3200);
+}
+
+/* "10분 내외" -> 10 / "1시간 내외" -> 60 / "1시간 30분" -> 90 */
+function parseWait(txt) {
+  var t = String(txt || '').replace(/\s/g, '');
+  if (!t) return null;
+  /* 우편·등기는 접수만 하고 나오면 된다 */
+  if (/우편|등기/.test(t)) return 10;
+  /* '1시간 초과'는 넉넉히 잡는다 */
+  if (/초과|이상/.test(t)) {
+    var hx = t.match(/(\d+)\s*시간/);
+    return hx ? Number(hx[1]) * 60 + 30 : 90;
+  }
+  var h = t.match(/(\d+)\s*시간/), m = t.match(/(\d+)\s*분/);
+  if (!h && !m) { var only = t.match(/^(\d+)$/); return only ? Number(only[1]) : null; }
+  return (h ? Number(h[1]) * 60 : 0) + (m ? Number(m[1]) : 0);
+}
+function hm_(t) {
+  var m = String(t || '').match(/(\d{1,2}):(\d{2})/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+function hhmm_(v) {
+  v = Math.round(v);
+  var nx = (v >= 1440) ? '다음날 ' : '';
+  return nx + ('0' + Math.floor(v / 60) % 24).slice(-2) + ':' + ('0' + (v % 60)).slice(-2);
+}
+function nowMin_() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
+
+/* 진료시작 전이면 기다리고, 점심시간에 걸리면 끝날 때까지 기다린다 */
+function usable_(t, s) {
+  if (s.openMin != null && t < s.openMin) t = s.openMin;
+  if (s.lunchS != null && s.lunchE != null && t >= s.lunchS && t < s.lunchE) t = s.lunchE;
+  return t;
+}
+
+/* 이른 시각부터 꺼내는 작은 대기줄 */
+function Heap_() { this.a = []; }
+Heap_.prototype.push = function (x) {
+  var a = this.a, i = a.push(x) - 1;
+  while (i > 0) { var p = (i - 1) >> 1; if (a[p].k <= a[i].k) break; var v = a[p]; a[p] = a[i]; a[i] = v; i = p; }
+};
+Heap_.prototype.pop = function () {
+  var a = this.a, top = a[0], last = a.pop();
+  if (a.length) {
+    a[0] = last;
+    for (var i = 0; ;) {
+      var l = 2 * i + 1, r = l + 1, m = i;
+      if (l < a.length && a[l].k < a[m].k) m = l;
+      if (r < a.length && a[r].k < a[m].k) m = r;
+      if (m === i) break;
+      var v = a[m]; a[m] = a[i]; a[i] = v; i = m;
+    }
+  }
+  return top;
+};
+
+/**
+ * 순서를 짠다.
+ *  obj : 'time' 이면 끝나는 시각을, 'dist' 면 총 주행거리를 줄인다.
+ * T 는 { from, fromKm, mat, dist, to, toKm } — 도착지가 없으면 to 는 없어도 된다.
+ */
+function planRoute(stops, T, start, obj, pins) {
+  var n = stops.length;
+  pins = pins || [];
+  if (!n) return { ok: false, why: 'EMPTY' };
+  if (!T || !T.mat || T.mat.length < n) return { ok: false, why: 'NO_ROUTE' };
+  if (!T.from || T.from.length < n) T.from = new Array(n);
+  for (var q0 = 0; q0 < n; q0++) if (!T.mat[q0] || T.mat[q0].length < n) return { ok: false, why: 'NO_ROUTE' };
+
+  var byDist = (obj === 'dist');
+  var D = T.dist || [];
+  var fromKm = T.fromKm || [];
+  var toMin = T.to || null, toKm = T.toKm || [];
+
+  function km_(loc, j) {                      /* loc: 0=출발지, 1..n=병원 */
+    if (loc === 0) return Number(fromKm[j]) || 0;
+    if (loc - 1 === j) return 0;
+    return (D[loc - 1] && Number(D[loc - 1][j])) || 0;
+  }
+
+  var need = [];
+  for (var i = 0; i < n; i++) {
+    var sp = stops[i];
+    var pre = !!(sp.submitted || (sp.prereq && sp.prereq !== '불가능'));
+    var today = (sp.sameday !== '불가능');
+    need.push({
+      twice: (!pre && today),
+      once: pre ? '수령' : '접수',
+      wait: (sp.waitMin == null ? DEFAULT_WAIT : sp.waitMin),
+      stay: !!sp.stay          /* 대학병원 등: 자리를 뜨지 않고 기다렸다 받는다 */
+    });
+  }
+
+  var P3 = [1];
+  for (var k = 1; k <= n; k++) P3[k] = P3[k - 1] * 3;
+  var GOAL = P3[n] - 1;
+
+  var best = {}, h = new Heap_(), zero = [], code0 = 0;
+  for (var z = 0; z < n; z++) {
+    zero.push(0);
+    if (stops[z].skip) code0 += 2 * P3[z];
+  }
+  if (code0 === GOAL) return { ok: true, end: start, km: 0, steps: [] };
+  h.push({ k: 0, t: start, d: 0, loc: 0, code: code0, ready: zero, prev: null, step: null });
+
+  var guard = 0;
+  while (h.a.length) {
+    if (++guard > 400000) return { ok: false, why: 'TOO_BIG' };
+    var cur = h.pop();
+    var key = cur.loc + ':' + cur.code;
+    if (best[key] != null && best[key] <= cur.k) continue;
+    best[key] = cur.k;
+
+    if (cur.code === GOAL) {
+      var steps = [], p = cur;
+      while (p && p.step) { steps.unshift(p.step); p = p.prev; }
+      return { ok: true, end: cur.t, km: Math.round(cur.d * 10) / 10, steps: steps };
+    }
+
+    /* '먼저 가기'로 못 박은 곳은 그 차례가 될 때까지 다른 곳을 못 간다.
+       아직 한 번도 안 들른(0) 고정 병원 중 가장 앞선 것이 다음 차례다. */
+    var nextPin = -1;
+    for (var pi = 0; pi < pins.length; pi++) {
+      if (Math.floor(cur.code / P3[pins[pi]]) % 3 === 0) { nextPin = pins[pi]; break; }
+    }
+
+    for (var j = 0; j < n; j++) {
+      if (nextPin >= 0 && j !== nextPin) continue;
+      var st = Math.floor(cur.code / P3[j]) % 3;
+      if (st === 2) continue;
+
+      var move = (cur.loc === 0) ? T.from[j] : T.mat[cur.loc - 1][j];
+      if (cur.loc - 1 === j) move = 0;
+      if (move == null) continue;
+
+      var arrive = usable_(cur.t + move, stops[j]);
+      var kind, ns, ready = cur.ready, done;
+
+      if (st === 0) {
+        if (need[j].twice && need[j].stay) {
+          /* 접수하고 그 자리에서 기다렸다 받는다 — 한 번에 끝낸다 */
+          var got = usable_(arrive + need[j].wait, stops[j]);
+          kind = '접수+수령'; ns = 2;
+          done = got + STOP_MIN;
+        } else if (need[j].twice) {
+          kind = '접수'; ns = 1;
+          ready = cur.ready.slice();
+          ready[j] = arrive + need[j].wait;
+          done = arrive + STOP_MIN;
+        } else {
+          kind = need[j].once; ns = 2;
+          done = arrive + STOP_MIN;
+        }
+      } else {
+        arrive = usable_(Math.max(arrive, cur.ready[j]), stops[j]);
+        kind = '수령'; ns = 2;
+        done = arrive + STOP_MIN;
+      }
+
+      var nd = cur.d + km_(cur.loc, j);
+      var code = cur.code + (ns - st) * P3[j];
+      var nt = done;
+
+      /* 마지막 한 곳까지 끝났으면 도착지까지 돌아가는 몫도 넣는다 */
+      if (code === GOAL && toMin) {
+        var back = toMin[j];
+        if (back != null) { nt += back; nd += Number(toKm[j]) || 0; }
+      }
+
+      /* 무엇을 줄일지에 따라 견주는 값이 달라진다 */
+      var metric = byDist ? (nd + nt / 100000) : nt;
+
+      var nk = (j + 1) + ':' + code;
+      if (best[nk] != null && best[nk] <= metric) continue;
+
+      h.push({ k: metric, t: nt, d: nd, loc: j + 1, code: code, ready: ready, prev: cur,
+               step: { i: j, name: stops[j].name, kind: kind, at: arrive,
+                       move: move, wait: (kind === '접수+수령' ? need[j].wait : 0) } });
+    }
+  }
+  return { ok: false, why: 'NO_ROUTE' };
+}
+
+/**
+ * 17:30 마감을 지키도록 짠다.
+ * 넘치는 병원부터 '오늘은 접수만' -> '오늘 못 감' 으로 한 단계씩 미루고 다시 짠다.
+ * 반환: { ok, steps, end, half:[이름], out:[이름] }
+ */
+function planWithCutoff(stops, T, start, exact, obj, pins) {
+  pins = pins || [];
+  var work = stops.map(function (s) {
+    return { name: s.name, id: s.id, lat: s.lat, lng: s.lng,
+             sameday: s.sameday, prereq: s.prereq, waitMin: s.waitMin,
+             openMin: s.openMin, lunchS: s.lunchS, lunchE: s.lunchE,
+             submitted: s.submitted, stay: s.stay, skip: false };
+  });
+  var half = {}, out = {};
+
+  for (var turn = 0; turn <= stops.length * 2 + 1; turn++) {
+    var alive = 0;
+    for (var a = 0; a < work.length; a++) if (!work[a].skip) alive++;
+
+    var r = alive === 0 ? { ok: true, end: start, km: 0, steps: [] }
+          : (alive <= exact ? planRoute(work, T, start, obj, pins) : planGreedy(work, T, start, pins));
+    if (!r.ok && r.why === 'TOO_BIG') r = planGreedy(work, T, start, pins);
+
+    if (!r.ok) {          /* 길을 못 찾으면 마지막 한 곳을 뺀다 */
+      var last = -1;
+      for (var q = 0; q < work.length; q++) if (!work[q].skip) last = q;
+      if (last < 0) return { ok: false, why: 'NO_ROUTE' };
+      work[last].skip = true; out[work[last].name] = 1;
+      continue;
+    }
+
+    /* 마감을 넘는 마지막 단계를 찾는다 */
+    var bad = -1;
+    for (var k = 0; k < r.steps.length; k++) {
+      if (r.steps[k].at + STOP_MIN > DAY_END) bad = k;
+    }
+    if (bad < 0) {
+      return { ok: true, steps: r.steps, end: r.end, km: r.km || 0, rough: !!r.rough,
+               half: Object.keys(half), out: Object.keys(out) };
+    }
+
+    var j = r.steps[bad].i, w = work[j];
+    if (r.steps[bad].kind !== '접수' && !w.submitted &&
+        w.sameday !== '불가능' && !half[w.name]) {
+      w.sameday = '불가능';                 /* 오늘은 접수까지만 */
+      half[w.name] = 1;
+    } else {
+      w.skip = true;                        /* 오늘은 못 간다 */
+      out[w.name] = 1;
+      delete half[w.name];
+    }
+  }
+  return { ok: false, why: 'NO_ROUTE' };
+}
+
+/* 정밀 계산이 안 될 때 쓰는 간단한 방법: 가까운 곳부터 차례로.
+   최적은 아니지만 순서를 아예 못 내놓는 것보다 낫다. */
+function planGreedy(stops, T, start, pins) {
+  pins = pins || [];
+  var n = stops.length, st = [], ready = [], steps = [], t = start, loc = 0, i, km = 0;
+  var D = T.dist || [], fromKm = T.fromKm || [], toKm = T.toKm || [];
+  function km_(a, b) {
+    if (a === 0) return Number(fromKm[b]) || 0;
+    if (a - 1 === b) return 0;
+    return (D[a - 1] && Number(D[a - 1][b])) || 0;
+  }
+  for (i = 0; i < n; i++) { st.push(stops[i].skip ? 2 : 0); ready.push(0); }
+
+  for (var turn = 0; turn < n * 2 + 2; turn++) {
+    var done = true;
+    for (i = 0; i < n; i++) if (st[i] < 2) done = false;
+    if (done) {
+      if (T.to && loc > 0 && T.to[loc - 1] != null) {
+        t += T.to[loc - 1]; km += Number(toKm[loc - 1]) || 0;
+      }
+      return { ok: true, end: t, km: Math.round(km * 10) / 10, steps: steps, rough: true };
+    }
+
+    var nextPin = -1;
+    for (var pi = 0; pi < pins.length; pi++) {
+      if (st[pins[pi]] === 0) { nextPin = pins[pi]; break; }
+    }
+
+    var pickJ = -1, pickAt = Infinity, pickKind = '';
+    for (var j = 0; j < n; j++) {
+      if (nextPin >= 0 && j !== nextPin) continue;
+      if (st[j] === 2) continue;
+      var mv = (loc === 0) ? T.from[j] : T.mat[loc - 1][j];
+      if (loc - 1 === j) mv = 0;
+      if (mv == null) continue;
+      var at = usable_(t + mv, stops[j]), kd;
+      var pre = !!(stops[j].submitted || (stops[j].prereq && stops[j].prereq !== '불가능'));
+      var today = (stops[j].sameday !== '불가능');
+      if (st[j] === 1) { at = usable_(Math.max(at, ready[j]), stops[j]); kd = '수령'; }
+      else kd = pre ? '수령' : '접수';
+      if (at < pickAt) { pickAt = at; pickJ = j; pickKind = kd; }
+    }
+    if (pickJ < 0) return { ok: false, why: 'NO_ROUTE' };
+
+    var s2 = stops[pickJ], pre2 = !!(s2.submitted || (s2.prereq && s2.prereq !== '불가능'));
+    var today2 = (s2.sameday !== '불가능');
+    var mv2 = (loc === 0) ? T.from[pickJ] : T.mat[loc - 1][pickJ];
+    if (loc - 1 === pickJ) mv2 = 0;
+    var w2 = (s2.waitMin == null ? DEFAULT_WAIT : s2.waitMin);
+    km += km_(loc, pickJ);
+
+    if (st[pickJ] === 0 && !pre2 && today2 && s2.stay) {
+      /* 그 자리에서 기다렸다 받는다 */
+      st[pickJ] = 2;
+      pickAt = usable_(pickAt + w2, s2);
+      pickKind = '접수+수령';
+    } else if (st[pickJ] === 0 && !pre2 && today2) {
+      st[pickJ] = 1;
+      ready[pickJ] = pickAt + w2;
+    } else st[pickJ] = 2;
+
+    steps.push({ i: pickJ, name: s2.name, kind: pickKind, at: pickAt, move: mv2,
+                 wait: (pickKind === '접수+수령' ? w2 : 0) });
+    t = pickAt + STOP_MIN;
+    loc = pickJ + 1;
+  }
+  return { ok: false, why: 'NO_ROUTE' };
+}
+
+
+/* ---------- 동선 화면 ---------- */
+
+/* 그 날 가야 할 곳 (완료·보류 제외) */
+function stopsOf(date) {
+  return visitsOf('visit').filter(function (v) {
+    return (v.date || '') === date && v.status !== '완료';
+  }).sort(cmpVisit_);
+}
+/* 오늘·앞으로의 날짜만 동선을 짤 수 있다 */
+function planDay_(date) { return !!date && date >= todayStr(); }
+function cmpVisit_(a, b) {
+  var x = a.order || 9999, y = b.order || 9999;
+  if (x !== y) return x - y;
+  return a.name.localeCompare(b.name, 'ko');
+}
+
+/* 길 안내에 쓸 지점. 주차가 '인근'이면 주차장 좌표를 쓴다. */
+function pointOf(h) {
+  if (!h) return null;
+  if (h.parking === '인근') return hasParkPoint(h) ? { lat: h.pLat, lng: h.pLng } : null;
+  return (h.lat && h.lng) ? { lat: h.lat, lng: h.lng } : null;
+}
+
+/* 날짜 묶음 위에 붙는 출발지 + 계산 버튼 */
+function planBar(date) {
+  var mine = (PLAN && !PLAN.err && PLAN.date === date);
+  var endKind = MYEND ? MYEND.kind : '';
+
+  /* 지난번에 쓴 출발 주소를 미리 채워 둔다. 매일 같은 곳에서 나가면 칠 일이 없다. */
+  var preAddr = (MYLOC && MYLOC.kind === 'addr') ? MYLOC.label : (lastAddrGet() || '');
+  var openAddr = (!MYLOC && !!preAddr);
+
+  return '<div class="planbar">' +
+    '<div class="locline">' +
+      '<span class="tag">출발</span>' +
+      '<button class="sub' + (MYLOC && MYLOC.kind === 'gps' ? ' on' : '') +
+        '" onclick="useGps()">📍 현재 위치</button>' +
+      '<button class="sub' + (MYLOC && MYLOC.kind === 'addr' ? ' on' : '') +
+        '" onclick="toggleAddr()">주소</button>' +
+    '</div>' +
+    '<div id="addrBox"' + (openAddr ? ' style="display:block"' : '') + '>' +
+      '<div class="arow">' +
+      '<input type="text" id="p_addr" placeholder="출발 주소 (예: 의정부시 신흥로 145)" ' +
+             'enterkeyhint="search" value="' + esc(preAddr) + '" ' +
+             'onkeydown="if(event.key===\'Enter\'){event.preventDefault();useAddr();}">' +
+      '<button type="button" class="find" onclick="useAddr()">찾기</button>' +
+      '</div></div>' +
+
+    '<div class="locline">' +
+      '<span class="tag">도착</span>' +
+      '<button class="sub' + (endKind === 'home' ? ' on' : '') + '" onclick="useSpot(\'home\')">집</button>' +
+      '<button class="sub' + (endKind === 'office' ? ' on' : '') + '" onclick="useSpot(\'office\')">사무실</button>' +
+      '<button class="sub' + (endKind === 'custom' ? ' on' : '') + '" onclick="toggleEnd()">직접</button>' +
+    '</div>' +
+    '<div id="endBox">' +
+      '<div class="arow">' +
+      '<input type="text" id="p_end" placeholder="도착 주소" ' +
+             'enterkeyhint="search" ' +
+             'onkeydown="if(event.key===\'Enter\'){event.preventDefault();useEndAddr();}">' +
+      '<button type="button" class="find" onclick="useEndAddr()">찾기</button>' +
+      '</div></div>' +
+
+    '<div class="locnow">' +
+      (MYLOC ? '출발 <b>' + esc(MYLOC.label) + '</b>' +
+               (MYLOC.found && MYLOC.found !== MYLOC.label
+                  ? ' <span class="found">→ ' + esc(MYLOC.found) + '</span>' : '')
+             : '출발지를 정하세요') +
+      ' &nbsp;→&nbsp; ' +
+      (MYEND ? '도착 <b>' + esc(MYEND.label) + '</b>' +
+               (MYEND.found && MYEND.found !== MYEND.label
+                  ? ' <span class="found">→ ' + esc(MYEND.found) + '</span>' : '')
+             : '도착지를 정하세요') +
+    '</div>' +
+    '<button class="calcbtn" onclick="calcPlan(\'' + date + '\')">' +
+      (mine ? '다시 계산' : '동선 계산') + '</button>' +
+  '</div>';
+}
+
+/* 계산된 순서를 아직 쓸 수 있는지.
+   완료된 곳이 빠지는 건 괜찮다. 계산할 때 없던 병원이 늘어난 경우만 다시 계산한다.
+   (좌표가 없어 계산에서 빠진 병원도 '본' 것이므로 다시 계산할 이유가 아니다) */
+function curPlan() {
+  if (!PLAN || PLAN.err || !PLAN.modes) return null;
+  return PLAN.modes[PLAN_MODE] || PLAN.modes.time || PLAN.modes.dist || null;
+}
+
+function planUsable(date) {
+  if (!PLAN || PLAN.err || !curPlan()) return false;
+  if (PLAN.date !== date) return false;
+  var seen = PLAN.seen || {};
+  var todo = stopsOf(date);
+  if (!todo.length) return false;
+  for (var i = 0; i < todo.length; i++) if (!seen[todo[i].id]) return false;
+  return true;
+}
+
+/* 오늘 묶음을 계산된 순서로 그린다 */
+/* 두 방식을 견주는 카드 */
+function modeCard() {
+  var A = PLAN.modes.dist, B = PLAN.modes.time;
+  function line(m, key, label) {
+    if (!m) return '';
+    var cnt = 0, seen = {};
+    m.steps.forEach(function (st) { if (!seen[st.i]) { seen[st.i] = 1; cnt++; } });
+    var later = (m.out || []).length;
+    return '<button class="modebtn' + (PLAN_MODE === key ? ' on' : '') +
+      '" onclick="setMode(\'' + key + '\')">' +
+      '<span class="nm">' + label + '</span>' +
+      '<span class="val">' + (m.km ? m.km + 'km' : '-') +
+        ' · ' + dur_(m.end - PLAN.start) +
+        (later ? ' · ' + later + '곳 내일' : '') + '</span></button>';
+  }
+  if (!A && !B) return '';
+  return '<div class="modebox">' + line(A, 'dist', '최단거리') + line(B, 'time', '최단시간') + '</div>';
+}
+
+function planBody(date) {
+  var cur = curPlan();
+  if (!cur) return '';
+  var live = {};
+  stopsOf(date).forEach(function (v) { live[v.id] = v; });
+
+  /* 아직 안 끝난 단계만 남긴다 */
+  var steps = cur.steps.filter(function (st) { return !!live[PLAN.stops[st.i].id]; });
+
+  /* 제자리에서 기다렸다 받는 경우는 한 장으로 묶는다 */
+  var rows = [];
+  for (var k = 0; k < steps.length; k++) {
+    var st = steps[k];
+    if (k + 1 < steps.length && steps[k + 1].i === st.i) {
+      rows.push({ i: st.i, kind: '접수+수령', wait: steps[k + 1].at - st.at, again: false });
+      k++;
+      continue;
+    }
+    var seenBefore = false;
+    for (var q = 0; q < k; q++) if (steps[q].i === st.i) seenBefore = true;
+    /* 대학병원처럼 계산에서 이미 한 번으로 묶인 경우는 대기시간이 단계에 실려 온다 */
+    rows.push({ i: st.i, kind: st.kind, wait: st.wait || 0,
+                again: seenBefore, next: null });
+  }
+  /* 접수만 하고 나중에 받는 경우, 몇 번째에 다시 오는지 */
+  rows.forEach(function (r, idx) {
+    if (r.kind !== '접수') return;
+    for (var q = idx + 1; q < rows.length; q++) if (rows[q].i === r.i) { r.next = q + 1; break; }
+  });
+
+  var out = modeCard();
+
+  /* 고정해 둔 곳이 있으면 맨 위에 알린다 */
+  var pn = pinList_(date);
+  if (pn.length) {
+    var nm = pn.map(function (id) {
+      var vv = live[id];
+      if (vv) return vv.name;
+      var st0 = null;
+      PLAN.stops.forEach(function (x) { if (x.id === id) st0 = x; });
+      return st0 ? st0.name : '?';
+    });
+    out += '<div class="pinbar"><span class="who">📌 먼저 가기 · ' +
+           esc(nm.join(' → ')) + '</span>' +
+           '<button onclick="clearPins()">처음부터 다시</button></div>';
+  }
+
+  /* 출발 전에 사전신청해 둘 곳 */
+  var pre = [];
+  rows.forEach(function (r) {
+    var stop = PLAN.stops[r.i], h = findHospital(live[stop.id]);
+    if (!stop.submitted && h && h.prereq && h.prereq !== '불가능') {
+      pre.push(stop.name + '(' + h.prereq + ')');
+    }
+  });
+  if (pre.length) {
+    out += '<div class="prebox"><b>출발 전 사전신청</b><br>' + esc(pre.join(' · ')) + '</div>';
+  }
+
+  if (!rows.length && !(cur.out && cur.out.length)) return '';
+
+  var half = {}; (cur.half || []).forEach(function (n) { half[n] = 1; });
+
+  rows.forEach(function (r, idx) {
+    var stop = PLAN.stops[r.i], v = live[stop.id], h = findHospital(v);
+    var cls = r.kind === '수령' ? 'get' : (r.kind === '접수' ? 'put' : 'both');
+
+    out += '<div class="' + recCls(h, 'planrec') + '">' +
+      '<div class="ordhead">' +
+        '<span class="ordnum">' + (idx + 1) + '</span>' +
+        '<h2>' + (r.again ? '↩ ' : '') + esc(v.name) +
+          (pinAt_(date, v.id) > -1 ? '<span class="pinmark">📌</span>' : '') + '</h2>' +
+        '<span class="kd ' + cls + '">' + r.kind + '</span>' +
+      '</div>' +
+      infoBlock(h);
+
+    var memo = plainMemo(v);
+    if (memo) out += '<div class="memo">' + esc(memo) + '</div>';
+
+    /* 왜 이렇게 도는지 한 줄로 설명 */
+    if (r.kind === '수령' && stop.submitted) {
+      out += '<div class="whyline">지난번 접수해 둠 · 받기만 하면 됩니다</div>';
+    } else if (r.kind === '수령' && !r.again && h && h.prereq && h.prereq !== '불가능') {
+      out += '<div class="whyline">사전신청(' + esc(h.prereq) + ') 해두고 방문</div>';
+    } else if (r.kind === '접수+수령') {
+      out += '<div class="whyline stay">여기서 기다렸다 받습니다' +
+             (r.wait > 0 ? ' · 약 ' + dur_(r.wait) : '') + '</div>';
+    } else if (r.kind === '접수' && r.next) {
+      out += '<div class="whyline">' + r.next + '번에서 다시 와 받습니다</div>';
+    } else if (r.kind === '접수' && half[v.name]) {
+      out += '<div class="whyline warn">오늘은 접수까지만 · 수령은 다음에</div>';
+    }
+
+    /* 오늘 받을 수 없는 곳은 '완료' 대신 '접수함' 을 준다.
+       누르면 접수한 것으로 표시하고 보류로 넘긴다. 다음에 수령만 잡힌다. */
+    /* 길찾기 두 가지 + 먼저 가기 (#1 · #2) */
+    var pAt = pinAt_(date, v.id);
+    out += '<div class="navrow">' +
+      '<button class="route" onclick="routeOne(\'' + v.id + '\')">🚩 길찾기</button>' +
+      (idx > 0 ? '<button class="route" onclick="routePlan(\'' + v.id + '\')">🚩 여기까지</button>' : '') +
+      /* 다시 들르는 줄(↩)에는 붙이지 않는다. 고정은 '처음 가는 차례'를 정하는 것이라서. */
+      (r.again ? '' :
+        '<button class="pinbtn' + (pAt > -1 ? ' on' : '') + '" onclick="pinFirst(\'' + v.id + '\')">' +
+          (pAt > -1 ? '📌 해제' : '📌 먼저') + '</button>') +
+    '</div>';
+
+    var halfOnly = (r.kind === '접수' && !r.next);
+    out += '<div class="foot">' +
+      (r.kind === '접수' && r.next ? ''
+        : halfOnly
+          ? '<button class="small" onclick="submitAndHold(\'' + v.id + '\')">접수함</button>'
+          : '<button class="small" onclick="doneVisit(\'' + v.id + '\')">완료</button>') +
+      '<button class="hold small" onclick="holdVisit(\'' + v.id + '\')">보류</button>' +
+      '<button class="ghost small" onclick="openVisitForm(\'' + v.id + '\')">수정</button>' +
+    '</div></div>';
+  });
+
+  if (rows.length) {
+    out += '<div class="planend">총 ' + dur_(cur.end - PLAN.start) + ' 걸립니다</div>';
+    out += '<button class="route wide" onclick="routePlan()">🚩 남은 곳 전체 길찾기</button>';
+  }
+
+  /* 오늘 못 가는 곳 */
+  var outNames = {}; (cur.out || []).forEach(function (n) { outNames[n] = 1; });
+  var inPlan = {};
+  PLAN.stops.forEach(function (st) { inPlan[st.id] = 1; });
+
+  var later = '';
+  stopsOf(date).forEach(function (v) {
+    var shown = rows.some(function (r) { return PLAN.stops[r.i].id === v.id; });
+    if (shown) return;
+    var h2 = findHospital(v);
+    var why = outNames[v.name] ? '17:30 안에 못 감'
+            : (!inPlan[v.id] ? '좌표 없음' : '');
+    later += '<div class="' + recCls(h2) + '">' +
+      '<div class="ordhead"><h2>' + esc(v.name) + '</h2>' +
+        (why ? '<span class="kd warn">' + why + '</span>' : '') + '</div>' +
+      infoBlock(h2) +
+      (plainMemo(v) ? '<div class="memo">' + esc(plainMemo(v)) + '</div>' : '') +
+      '<div class="foot">' +
+        '<button class="small" onclick="doneVisit(\'' + v.id + '\')">완료</button>' +
+        '<button class="hold small" onclick="holdVisit(\'' + v.id + '\')">보류</button>' +
+        '<button class="ghost small" onclick="openVisitForm(\'' + v.id + '\')">수정</button>' +
+      '</div></div>';
+  });
+  if (later) out += '<div class="planend">오늘 순서에 못 넣은 곳</div>' + later;
+
+  var note = [];
+  if (cur.half && cur.half.length) note.push('오늘은 접수까지만: ' + esc(cur.half.join(', ')));
+  if (cur.out && cur.out.length) note.push(hhmm_(DAY_END) + ' 안에 못 가는 곳: ' + esc(cur.out.join(', ')));
+  if (cur.rough) note.push('병원이 ' + PLAN_EXACT + '곳을 넘어 간단한 방법으로 잡았습니다.');
+  if (PLAN.skipped.length) note.push('제외: ' + esc(PLAN.skipped.join(', ')));
+  if (PLAN.guessed.length) note.push('발급소요 미입력이라 ' + DEFAULT_WAIT + '분으로 잡음: ' + esc(PLAN.guessed.join(', ')));
+  if (PLAN.miss) note.push('이동시간을 못 구한 구간 ' + PLAN.miss + '개는 빼고 계산했습니다.');
+  if (PLAN.saveErr) note.push('이동시간을 저장하지 못했습니다(' + esc(PLAN.saveErr) + ').');
+  if (PLAN.at != null) note.push(hhmm_(PLAN.at) + ' 에 짠 순서입니다. 시간이 많이 지났으면 다시 계산하세요.');
+  note.push('병원 체류는 ' + STOP_MIN + '분, 서류 발급 마감은 ' + hhmm_(DAY_END) + '로 잡았습니다.');
+  out += '<div class="plannote">· ' + note.join('<br>· ') + '</div>';
+  return out;
+}
+
+/* 분 -> "1시간 20분" */
+function dur_(m) {
+  m = Math.max(0, Math.round(m));
+  var h = Math.floor(m / 60), r = m % 60;
+  if (h && r) return h + '시간 ' + r + '분';
+  if (h) return h + '시간';
+  return r + '분';
+}
+
+/* ---------- 출발 위치 ---------- */
+function toggleAddr() {
+  var b = document.getElementById('addrBox');
+  b.style.display = (b.style.display === 'block') ? 'none' : 'block';
+  if (b.style.display === 'block') document.getElementById('p_addr').focus();
+}
+function toggleEnd() {
+  var b = document.getElementById('endBox');
+  b.style.display = (b.style.display === 'block') ? 'none' : 'block';
+  if (b.style.display === 'block') document.getElementById('p_end').focus();
+}
+
+/* 집·사무실. 저장된 게 없으면 물어보고 이 기기에 기억한다. */
+function useSpot(kind) {
+  var saved = spotGet(kind);
+  if (saved && !(MYEND && MYEND.kind === kind)) {
+    MYEND = { lat: saved.lat, lng: saved.lng, label: SPOT_NAME[kind], kind: kind };
+    PLAN = null; planSave(); render();
+    return;
+  }
+  var msg = saved ? (SPOT_NAME[kind] + ' 주소를 바꿀까요?\n지금: ' + saved.addr)
+                  : (SPOT_NAME[kind] + ' 주소를 입력하세요');
+  var q = prompt(msg, saved ? saved.addr : '');
+  if (q == null) return;
+  q = q.trim();
+  if (!q) return;
+
+  toast('주소 찾는 중…');
+  srv().then(function (r) {
+      spotSet(kind, { addr: q, lat: r.lat, lng: r.lng });
+      MYEND = { lat: r.lat, lng: r.lng, label: SPOT_NAME[kind], kind: kind };
+      PLAN = null; planSave(); render();
+      toast(SPOT_NAME[kind] + ' 주소를 저장했습니다', 3600);
+    })
+    .err(function (e) { toast(e.message, 5200); })
+    .geo(q);
+}
+
+function useEndAddr() {
+  var q = document.getElementById('p_end').value.trim();
+  if (!q) { toast('도착 주소를 입력하세요'); return; }
+  toast('주소 찾는 중…');
+  srv().then(function (r) {
+      MYEND = { lat: r.lat, lng: r.lng, label: q, found: r.addr || '', kind: 'custom' };
+      PLAN = null; planSave(); render(); toast('도착지 · ' + (r.addr || q), 4200);
+    })
+    .err(function (e) { toast(e.message, 5200); })
+    .geo(q);
+}
+
+/* 무엇을 줄일지 고른다 */
+function setMode(m) {
+  PLAN_MODE = m;
+  try { localStorage.setItem('hdb_mode', m); } catch (e) {}
+  render();
+}
+
+function useGps() {
+  if (!navigator.geolocation) { toast('이 기기에서는 현재 위치를 쓸 수 없습니다.', 4200); return; }
+  toast('현재 위치 확인 중…');
+  navigator.geolocation.getCurrentPosition(function (p) {
+    MYLOC = { lat: p.coords.latitude, lng: p.coords.longitude, label: '현재 위치', kind: 'gps' };
+    PLAN = null; planSave(); render(); toast('현재 위치를 잡았습니다. 이제 동선 계산을 누르세요.', 4000);
+  }, function (e) {
+    toast('위치를 못 잡았습니다 · ' + (e.code === 1 ? '위치 권한을 허용해 주세요' : e.message), 5600);
+  }, { enableHighAccuracy: true, timeout: 12000 });
+}
+
+function lastAddrGet() {
+  try { return localStorage.getItem('hdb_lastaddr') || ''; } catch (e) { return ''; }
+}
+
+/* next 를 주면 주소를 찾은 뒤 이어서 그 일을 한다 (동선 계산에서 쓴다) */
+function useAddr(next) {
+  var box = document.getElementById('p_addr');
+  var q = box ? box.value.trim() : '';
+  if (!q) {
+    toast('출발 주소를 입력한 뒤 찾기 를 눌러 주세요', 4200);
+    var b = document.getElementById('addrBox');
+    if (b) { b.style.display = 'block'; if (box) box.focus(); }
+    return;
+  }
+  toast('주소 찾는 중…');
+  srv().then(function (r) {
+      MYLOC = { lat: r.lat, lng: r.lng, label: q, found: r.addr || '', kind: 'addr' };
+      try { localStorage.setItem('hdb_lastaddr', q); } catch (e) {}
+      PLAN = null; planSave(); render();
+      if (typeof next === 'function') { next(); return; }
+      toast('출발지 · ' + (r.addr || q) + '\n맞으면 동선 계산을 누르세요.', 5200);
+    })
+    .err(function (e) { toast('출발 주소를 못 찾았습니다 · ' + e.message +
+                              '\n시·군까지 넣어 보세요 (예: 의정부시 신흥로 145)', 6000); })
+    .geo(q);
+}
+
+/* ---------- 계산 ---------- */
+function calcPlan(date) {
+  date = date || todayStr();
+  if (!MYLOC) {
+    /* 주소를 쳐 놓고 찾기를 안 눌렀으면, 여기서 대신 찾아 주고 이어서 계산한다 */
+    var ai = document.getElementById('p_addr');
+    var typed = ai ? ai.value.trim() : '';
+    if (typed) { useAddr(function () { calcPlan(date); }); return; }
+    toast('출발지를 먼저 정하세요.\n📍현재 위치 를 누르거나, 주소를 넣고 찾기 를 누르세요.', 5600);
+    return;
+  }
+  if (!MYEND) { toast('도착지를 정하세요 (집 · 사무실 · 직접)', 4600); return; }
+
+  var list = stopsOf(date);
+  if (!list.length) { toast('그 날 갈 병원이 없습니다.', 4000); return; }
+
+  var stops = [], skipped = [], guessed = [], pts = [];
+
+  for (var i = 0; i < list.length; i++) {
+    var h = findHospital(list[i]);
+    var pt = pointOf(h);
+    if (!pt) {
+      skipped.push(list[i].name +
+        (h && h.parking === '인근' ? ' (주차장 주소 없음)' : ' (좌표 없음)'));
+      continue;
+    }
+    var w = parseWait(h.wait);
+    if (w == null && (!h.prereq || h.prereq === '불가능') && h.sameday !== '불가능') {
+      guessed.push(list[i].name);
+    }
+    /* 점심시간은 적어 둔 곳만 반영한다. 비어 있으면 쉬지 않는 것으로 본다. */
+    var lu = String(h.lunch || '').trim();
+    if (lu === '없음') lu = '';
+
+    pts.push(pt);
+    stops.push({
+      name: list[i].name, id: list[i].id, lat: pt.lat, lng: pt.lng,
+      submitted: isSubmitted(list[i]),
+      /* 병원DB에서 '접수 후 기다렸다 수령'으로 표시해 둔 곳 */
+      stay: !!h.stay,
+      sameday: h.sameday, prereq: h.prereq, waitMin: w,
+      openMin: hm_(h.open),
+      lunchS: hm_(lu.split('-')[0]),
+      lunchE: hm_(lu.split('-')[1])
+    });
+  }
+
+  if (!stops.length) {
+    PLAN = { date: date, err: '순서를 짤 수 있는 병원이 없습니다.\n' + skipped.join('\n') };
+    render(); return;
+  }
+  if (stops.length > PLAN_MAX) {
+    PLAN = { date: date, err: '한 번에 ' + PLAN_MAX + '곳까지만 계산할 수 있습니다. (지금 ' + stops.length + '곳)' };
+    render(); return;
+  }
+
+  toast('실제 이동시간 확인 중… 처음 계산은 조금 걸립니다', 20000);
+
+  var ptStr = pts.map(function (p) { return p.lat + ',' + p.lng; }).join(';');
+  srv().then(function (T) {
+      /* 오늘이면 지금 시각부터, 앞날이면 아침 9시부터로 잡는다 */
+      var start = (date === todayStr()) ? nowMin_() : 9 * 60;
+      /* 한 번 받아온 표로 두 가지를 다 계산한다. 서버는 더 부르지 않는다. */
+      /* 고정해 둔 곳이 아직 그 날 목록에 있으면 그 순서를 지킨다 (#1) */
+      var idx0 = {}, pins = [];
+      stops.forEach(function (sp, si) { idx0[sp.id] = si; });
+      pinList_(date).forEach(function (id) { if (idx0[id] != null) pins.push(idx0[id]); });
+
+      var rt = planWithCutoff(stops, T, start, PLAN_EXACT, 'time', pins);
+      var rd = planWithCutoff(stops, T, start, PLAN_EXACT, 'dist', pins);
+      var r = rt.ok ? rt : rd;
+      if (!r.ok) {
+        PLAN = { date: date, err: (start >= DAY_END)
+          ? ('서류 발급 마감(' + hhmm_(DAY_END) + ')이 지났습니다.\n내일 일정으로 옮기세요.')
+          : '이동시간을 구하지 못해 순서를 짜지 못했습니다.\n잠시 후 다시 시도해 주세요.' };
+      } else {
+        var seen = {};
+        list.forEach(function (v) { seen[v.id] = 1; });
+        PLAN = { date: date, start: start, stops: stops, seen: seen,
+                 modes: { time: rt.ok ? rt : null, dist: rd.ok ? rd : null },
+                 skipped: skipped, guessed: guessed, pins: pins,
+                 /* 표를 들고 있으면 순서를 바꿔도 서버를 다시 안 불러도 된다 */
+                 T: { from: T.from, fromKm: T.fromKm, mat: T.mat,
+                      dist: T.dist, to: T.to, toKm: T.toKm },
+                 at: nowMin_(),
+                 miss: T.miss || 0, saveErr: T.saveErr || '' };
+      }
+      toast(r.ok ? '동선을 짰습니다' : '계산 실패', 3000);
+      planSave(); render();
+    })
+    .err(function (e) { toast('이동시간을 받지 못했습니다 · ' + e.message, 6000); })
+    .times(ptStr, MYLOC.lat + ',' + MYLOC.lng, MYEND.lat + ',' + MYEND.lng);
+}
+
+/* 계산된 순서를 네이버 지도로 넘긴다 (같은 병원 두 번은 한 번만) */
+function routePlan(untilId) {
+  var cur = curPlan();
+  if (!cur) return;
+
+  /* 이미 완료·보류한 병원은 빼고 보낸다 */
+  var live = {};
+  stopsOf(PLAN.date).forEach(function (v) { live[v.id] = 1; });
+
+  var seen = {}, list = [], dropped = 0;
+  for (var i = 0; i < cur.steps.length; i++) {
+    var st = cur.steps[i], stop = PLAN.stops[st.i];
+    if (seen[st.i] || !live[stop.id]) continue;
+    seen[st.i] = 1;
+    if (list.length >= NAV_MAX_STOPS) { dropped++; continue; }
+    list.push(stop);
+    if (untilId && stop.id === untilId) { dropped = 0; break; }
+  }
+  if (!list.length) { toast('남은 병원이 없습니다.', 3500); return; }
+
+  var d = list[list.length - 1];
+  var u = 'nmap://route/car?dlat=' + d.lat + '&dlng=' + d.lng +
+          '&dname=' + encodeURIComponent(d.name);
+  for (var k = 0; k < list.length - 1; k++) {
+    var n = k + 1;
+    u += '&v' + n + 'lat=' + list[k].lat + '&v' + n + 'lng=' + list[k].lng +
+         '&v' + n + 'name=' + encodeURIComponent(list[k].name);
+  }
+  u += '&appname=phurom0103-coder.github.io';
+
+  if (dropped) {
+    toast(NAV_MAX_STOPS + '곳까지만 지도로 보냅니다. ' + dropped + '곳은 빠졌습니다.', 5200);
+  }
+  var a = document.createElement('a');
+  a.href = u; a.target = '_blank'; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+/* ---------- 주유소 · LPG충전소 (오피넷) ---------- */
+var FUEL_KINDS = [['lpg', 'LPG'], ['gas', '휘발유'], ['diesel', '경유']];
+var FUEL_KIND = 'lpg';
+var GAS_MODE = 'route';      /* route = 동선 따라 · near = 내 주변 */
+var GAS = null, GAS_PTS = null, GAS_NAMES = [], GAS_AT = null, GAS_BUSY = false;
+
+try { var _fk = localStorage.getItem('hdb_fuel'); if (_fk) FUEL_KIND = _fk; } catch (e) {}
+
+/* 짜 놓은 동선을 [출발지, 병원, 병원, ..., 도착지] 로 편다.
+   아직 안 짰으면 그 날 등록한 순서대로라도 쓴다. */
+function gasRoutePts() {
+  var pts = [], names = [];
+  var date = (PLAN && !PLAN.err) ? PLAN.date : todayStr();
+  var cur = curPlan();
+
+  if (MYLOC) { pts.push({ lat: MYLOC.lat, lng: MYLOC.lng }); names.push('출발'); }
+
+  var live = {};
+  stopsOf(date).forEach(function (v) { live[v.id] = v; });
+
+  if (cur && PLAN && !PLAN.err) {
+    var seen = {};
+    cur.steps.forEach(function (s2) {
+      var sp = PLAN.stops[s2.i];
+      if (seen[s2.i] || !live[sp.id]) return;
+      seen[s2.i] = 1;
+      pts.push({ lat: sp.lat, lng: sp.lng }); names.push(sp.name);
+    });
+  } else {
+    stopsOf(date).forEach(function (v) {
+      var pt = pointOf(findHospital(v));
+      if (pt) { pts.push(pt); names.push(v.name); }
+    });
+  }
+
+  if (MYEND) { pts.push({ lat: MYEND.lat, lng: MYEND.lng }); names.push('도착'); }
+  return { pts: pts, names: names };
+}
+
+function openGas() {
+  var r = gasRoutePts();
+  /* 갈 곳이 없으면 '내 주변'으로 연다 */
+  if (r.pts.length < 2) GAS_MODE = 'near';
+  buildGasSeg();
+  document.getElementById('gasList').innerHTML = '';
+  GAS = null;
+  openSheet('gasSheet');
+  loadGas();
+}
+
+function buildGasSeg() {
+  var m = document.getElementById('seg_gasmode');
+  m.innerHTML =
+    '<button type="button" class="' + (GAS_MODE === 'route' ? 'sel' : '') +
+      '" onclick="pickGasMode(\'route\')">동선 따라</button>' +
+    '<button type="button" class="' + (GAS_MODE === 'near' ? 'sel' : '') +
+      '" onclick="pickGasMode(\'near\')">내 주변</button>';
+  document.getElementById('gasTitle').textContent =
+    (GAS_MODE === 'route') ? '동선 위의 주유·충전' : '주변 주유·충전';
+  var box = document.getElementById('seg_fuel');
+  box.innerHTML = FUEL_KINDS.map(function (o) {
+    return '<button type="button" class="' + (FUEL_KIND === o[0] ? 'sel' : '') +
+           '" onclick="pickFuel(\'' + o[0] + '\')">' + o[1] + '</button>';
+  }).join('');
+}
+
+function pickGasMode(m) {
+  if (GAS_MODE === m) return;
+  GAS_MODE = m; GAS = null;
+  buildGasSeg();
+  document.getElementById('gasList').innerHTML = '';
+  loadGas();
+}
+function pickFuel(k) {
+  if (FUEL_KIND === k) return;
+  FUEL_KIND = k; GAS = null;
+  try { localStorage.setItem('hdb_fuel', k); } catch (e) {}
+  buildGasSeg();
+  document.getElementById('gasList').innerHTML = '';
+  loadGas();
+}
+
+function gasNote(t) { document.getElementById('gasNote').innerHTML = t; }
+
+function loadGas(force) {
+  if (GAS_BUSY) return;
+
+  if (GAS_MODE === 'route') {
+    var r = gasRoutePts();
+    if (r.pts.length < 2) {
+      gasNote('동선이 없습니다. 방문일정에서 출발지·도착지를 정하고 <b>동선 계산</b>을 누른 뒤 다시 열어 주세요.');
+      return;
+    }
+    GAS_NAMES = r.names;
+    fetchGas(r.pts);
+    return;
+  }
+
+  GAS_NAMES = ['내 자리'];
+  if (!force && GAS_AT && (Date.now() - GAS_AT.t) < 120000) { fetchGas([GAS_AT]); return; }
+  if (!navigator.geolocation) { gasNote('이 기기에서는 현재 위치를 쓸 수 없습니다.'); return; }
+  gasNote('현재 위치를 잡는 중…');
+  navigator.geolocation.getCurrentPosition(function (p) {
+    GAS_AT = { lat: p.coords.latitude, lng: p.coords.longitude, t: Date.now() };
+    fetchGas([GAS_AT]);
+  }, function (e) {
+    gasNote('위치를 못 잡았습니다 · ' +
+      (e.code === 1 ? '위치 권한을 허용해 주세요' : esc(e.message)));
+  }, { enableHighAccuracy: true, timeout: 12000 });
+}
+
+function fetchGas(pts) {
+  GAS_BUSY = true;
+  GAS_PTS = pts;
+  gasNote('가격을 받아오는 중…' + (pts.length > 1 ? ' 동선이 길면 조금 걸립니다.' : ''));
+  var str = pts.map(function (p) { return p.lat + ',' + p.lng; }).join(';');
+  srv().then(function (res) {
+      GAS_BUSY = false; GAS = res; renderGas();
+    })
+    .err(function (e) {
+      GAS_BUSY = false;
+      gasNote('<span style="color:#B3261E">' + esc(e.message) + '</span>');
+    })
+    .fuel(str, FUEL_KIND);
+}
+
+/* 몇 번째 구간 옆인지를 사람 말로 */
+function segLabel_(i) {
+  var a = GAS_NAMES[i], b = GAS_NAMES[i + 1];
+  if (!a) return '';
+  if (!b) return a + ' 근처';
+  return a + ' → ' + b;
+}
+
+function renderGas() {
+  var el = document.getElementById('gasList');
+  if (!GAS || !GAS.list || !GAS.list.length) {
+    gasNote('둘레에서 찾지 못했습니다.');
+    el.innerHTML = ''; return;
+  }
+  var low = GAS.list[0].price;
+  var head = esc(GAS.label) + ' · 싼 순';
+  if (GAS_MODE === 'route') {
+    head += ' · 동선 ' + GAS_NAMES.length + '곳을 훑음 · 경로에서 4km 안';
+    if (!curPlan()) head += '<br>동선 계산 전이라 <b>등록한 순서</b>로 훑었습니다.';
+  } else {
+    head += ' · 둘레 ' + Math.round(GAS.radius / 1000) + 'km';
+  }
+  head += ' · ' + esc(GAS.at) + ' 기준';
+  if (GAS.fresh === 0) head += ' (담아 둔 값)';
+  gasNote(head);
+
+  el.innerHTML = GAS.list.map(function (o, i) {
+    var where = (GAS_MODE === 'route')
+      ? segLabel_(o.seg) + (o.off > 0.15 ? ' · 옆으로 ' + o.off + 'km' : ' · 길가')
+      : (o.off >= 1 ? o.off + 'km' : Math.round(o.off * 1000) + 'm');
+    return '<div class="gasitem' + (o.price === low ? ' cheap' : '') + '">' +
+      '<span class="no">' + (i + 1) + '</span>' +
+      '<span class="who"><b>' + esc(o.name) + '</b>' +
+        '<small>' + esc(o.brand) + ' · ' + esc(where) + '</small></span>' +
+      '<span class="pr"><b>' + (o.price ? o.price.toLocaleString() : '-') + '</b>' +
+        '<small>원</small></span>' +
+      (o.lat && o.lng ? '<button onclick="gasRoute(' + i + ')">길찾기</button>' : '') +
+    '</div>';
+  }).join('');
+}
+
+function gasRoute(i) {
+  var o = GAS && GAS.list && GAS.list[i];
+  if (!o || !o.lat || !o.lng) return;
+  openNaver_('nmap://route/car?dlat=' + o.lat + '&dlng=' + o.lng +
+             '&dname=' + encodeURIComponent(o.name) +
+             '&appname=phurom0103-coder.github.io');
+}
+
+/* ---------- 길찾기 ---------- */
+
+/* 이 병원 한 곳만 안내한다. 중간에 들르는 곳 없이 곧장 간다. (#2) */
+function routeOne(id) {
+  var v = VISITS.filter(function (x) { return x.id === id; })[0];
+  if (!v) return;
+  var h = findHospital(v);
+  var pt = pointOf(h);
+  if (!pt) {
+    toast(h && h.parking === '인근'
+      ? '주차장 주소가 없어 길찾기를 할 수 없습니다 · ' + v.name +
+        '\n병원DB에서 주차장 주소를 먼저 입력하세요.'
+      : '이 병원은 좌표가 없어 길찾기를 할 수 없습니다 · ' + v.name, 6000);
+    return;
+  }
+  var nm = v.name + (h.parking === '인근' ? ' 주차장' : '');
+  openNaver_('nmap://route/car?dlat=' + pt.lat + '&dlng=' + pt.lng +
+             '&dname=' + encodeURIComponent(nm) +
+             '&appname=phurom0103-coder.github.io');
+}
+
+function openNaver_(u) {
+  var a = document.createElement('a');
+  a.href = u; a.target = '_blank'; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+/* 1번부터 이 병원까지를 네이버 지도 자동차 길찾기로 넘긴다.
+   출발지는 비워 두면 네이버가 현재 위치를 잡는다. */
+function routeTo(id) {
+  var v = VISITS.filter(function (x) { return x.id === id; })[0];
+  if (!v) return;
+
+  var day = visitsOf('visit').filter(function (x) {
+    return (x.date || '') === (v.date || '') && x.status !== '완료';
+  });
+  day.sort(function (a, b) {
+    var p = a.order || 9999, q = b.order || 9999;
+    if (p !== q) return p - q;
+    return a.name.localeCompare(b.name, 'ko');
+  });
+
+  var stops = [], missing = [], noPark = [];
+  for (var i = 0; i < day.length; i++) {
+    var h = findHospital(day[i]);
+    var nm = day[i].name;
+
+    if (h && h.parking === '인근') {
+      /* 주차장이 따로 있는 병원은 병원 건물이 아니라 주차장으로 안내해야 한다.
+         주차장 주소가 없으면 엉뚱한 곳으로 보내게 되므로 길찾기를 하지 않는다. */
+      if (hasParkPoint(h)) stops.push({ name: nm + ' 주차장', lat: h.pLat, lng: h.pLng });
+      else noPark.push(nm);
+    } else if (h && h.lat && h.lng) {
+      stops.push({ name: nm, lat: h.lat, lng: h.lng });
+    } else {
+      missing.push(nm);
+      /* 지금 누른 병원 자체에 좌표가 없으면, 그 앞 병원이 목적지가 되어
+         전혀 다른 곳으로 안내된다. 그럴 바에는 안내하지 않는다. */
+      if (day[i].id === id) {
+        toast('이 병원은 좌표가 없어 길찾기를 할 수 없습니다 · ' + nm, 5200);
+        return;
+      }
+    }
+    if (day[i].id === id) break;
+  }
+
+  if (noPark.length) {
+    toast('주차장 주소가 없어 길찾기를 할 수 없습니다 · ' + noPark.join(', ') +
+          '\n병원DB에서 주차장 주소를 먼저 입력하세요.', 6500);
+    return;
+  }
+  if (!stops.length) { toast('좌표가 있는 병원이 없습니다.', 4200); return; }
+  if (stops.length > NAV_MAX_STOPS) {
+    toast('한 번에 최대 ' + NAV_MAX_STOPS + '곳까지만 보낼 수 있습니다.', 5200);
+    return;
+  }
+  if (missing.length) toast('좌표 없어 제외: ' + missing.join(', '), 5200);
+
+  var d = stops[stops.length - 1];
+  var u = 'nmap://route/car?dlat=' + d.lat + '&dlng=' + d.lng +
+          '&dname=' + encodeURIComponent(d.name);
+  for (var k = 0; k < stops.length - 1; k++) {
+    var n = k + 1;
+    u += '&v' + n + 'lat=' + stops[k].lat +
+         '&v' + n + 'lng=' + stops[k].lng +
+         '&v' + n + 'name=' + encodeURIComponent(stops[k].name);
+  }
+  u += '&appname=phurom0103-coder.github.io';
+
+  var a = document.createElement('a');
+  a.href = u; a.target = '_blank'; a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+/* ---------- 새 판 확인 ----------
+   아이콘으로 띄운 앱은 예전 파일을 계속 붙들고 있어서 고쳐도 안 바뀐다.
+   그래서 앱이 켜질 때 원본을 한 번 들여다보고, 판 번호가 다르면 알려준다. */
+var NEW_VER = '';
+var VER_STATE = '확인 전';
+var verBusy = false;
+
+/* 표시는 다시 그리기를 기다리지 않고 그 자리에서 바꾼다.
+   (예전에는 render 를 거쳐서, 확인이 끝나지 않으면 아무 변화가 없었다) */
+function verDone(txt) {
+  VER_STATE = txt;
+  verBusy = false;
+  var el = document.getElementById('verLine');
+  if (el) el.textContent = APP_VER + ' · ' + txt;
+}
+function verBusyNow() {
+  VER_STATE = '확인 중…';
+  verBusy = true;
+  var el = document.getElementById('verLine');
+  if (el) el.textContent = APP_VER + ' · 확인 중…';
+}
+
+function checkVersion() {
+  if (!window.fetch) { verDone('확인 불가 (옛 브라우저)'); return; }
+  verBusyNow();
+
+  var done = false;
+  /* 응답이 영영 안 오는 경우가 있어 시간을 끊는다 */
+  var timer = setTimeout(function () {
+    if (done) return;
+    done = true;
+    verDone('확인 못 함 · 시간 초과');
+  }, 9000);
+
+  function finish(txt) {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    verDone(txt);
+  }
+
+  var url = location.pathname + '?upd=' + Date.now();
+  fetch(url, { cache: 'no-store' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('응답 ' + r.status);
+      return r.text();
+    })
+    .then(function (t) {
+      var m = t.match(/APP_VER = '(v[0-9]+)'/);
+      if (!m) { finish('확인 못 함 · 판 번호 없음'); return; }
+      if (m[1] === APP_VER) { finish('최신'); return; }
+
+      /* 올라간 게 더 낮은 판이면 되돌리라고 권하면 안 된다 */
+      var mine = Number(APP_VER.slice(1)), there = Number(m[1].slice(1));
+      if (!(there > mine)) { finish('최신 (올라간 판 ' + m[1] + ')'); return; }
+
+      NEW_VER = m[1];
+      finish(NEW_VER + ' 나옴');
+      var ut = document.getElementById('updTxt');
+      if (ut) ut.textContent = '새 버전이 나왔습니다 (' + APP_VER + ' \u2192 ' + NEW_VER + ')';
+      var ub = document.getElementById('upd');
+      if (ub) ub.className = 'on';
+    })
+    .catch(function (e) {
+      finish('확인 못 함 · ' + String((e && e.message) || e).slice(0, 24));
+    });
+}
+
+/* 판 번호를 누르면: 새 버전이 있으면 바로 받아오고, 아니면 다시 확인한다 */
+function verTap() {
+  if (NEW_VER) { doUpdate(); return; }
+  if (verBusy) return;
+  checkVersion();
+}
+
+/* 판 번호를 길게 누르면 무조건 새로 받아온다 (확인이 안 될 때의 탈출구) */
+function forceUpdate() {
+  if (!confirm('앱 파일을 다시 받아올까요?')) return;
+  doUpdate();
+}
+
+function doUpdate() {
+  var ub = document.getElementById('upd');
+  if (ub) ub.className = '';
+  /* 주소를 살짝 바꿔야 휴대폰이 예전 파일을 버리고 새로 받아온다.
+     확인이 안 됐을 때도 쓸 수 있게 시각을 붙인다. */
+  var base = location.origin + location.pathname;
+  location.replace(base + '?v=' + (NEW_VER || 't' + Date.now()));
+}
+
+/* ---------- 시작 ----------
+   기기에 남아 있는 목록을 먼저 그려서 기다림 없이 띄우고,
+   새 자료는 뒤에서 받아 바꿔 끼운다. */
+(function () {
+  paintTabs();      /* 새로고침해도 보던 탭 그대로 */
+  planRestore();    /* 앱을 껐다 켜도 짜 둔 동선 그대로 (#4) */
+  pushGuard_();     /* 뒤로가기 한 칸을 미리 만들어 둔다 */
+  setTimeout(checkVersion, 2500);   /* 자료 받아오는 걸 방해하지 않게 조금 뒤에 */
+  if (!CODE) { showLogin(); return; }
+  var c = cacheRead();
+  if (c && c.hospitals && c.hospitals.length) {
+    DB = c.hospitals; VISITS = c.visits || [];
+    render();
+    loadAll(true);
+  } else {
+    loadAll();
+  }
+})();
+</script>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+
+</body>
+</html>
